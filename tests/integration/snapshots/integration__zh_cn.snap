@@ -1,0 +1,5 @@
+---
+source: tests/integration/main.rs
+expression: stderr
+---
+[TIMESTAMP]  INFO doit: doit 已启动（骨架）

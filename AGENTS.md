@@ -91,6 +91,13 @@ Note: jj automatically syncs with the underlying git repo, so git-compatible ope
 
 简化流程：当设计已确认时，可直接进行「编码实现」然后交由用户审计。
 
+### 编码后讲解
+
+每次编码完成后，讲解大致逻辑和关键决策，包含：
+- 做了什么
+- 为什么这样做
+- 有哪些值得注意的细节
+
 ### 提交时机
 
 - 用户审计完一阶段代码并明确确认后，才可 `jjit commit`
