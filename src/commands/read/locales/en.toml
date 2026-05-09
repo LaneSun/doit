@@ -1,0 +1,24 @@
+[read]
+skill = """
+Read file contents with line numbers. Each line prefixed with '<line>: '.
+
+Usage:
+  doit read '<file>'
+  doit read --lines N:M '<file>'
+
+Parameters:
+  file    - Path to the file to read
+  --lines - Line range in N:M format (1-indexed, inclusive).
+            Disables the default 500-line truncation.
+
+Output:
+  Each line prefixed with '<line-number>: ' (space after colon).
+  Without --lines: at most 500 lines; excess is truncated with a notice.
+  With --lines: exact range, no truncation.
+
+Scenario:
+  The LLM uses read to inspect file contents before editing.
+  For large files, use --lines to read specific sections.
+"""
+
+truncated = "... [truncated: %{hidden} lines omitted, use --lines N:M to view a specific range]"

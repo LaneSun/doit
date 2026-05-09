@@ -33,3 +33,7 @@ path = "src/commands/exit/tests/integration/main.rs"
 [[test]]
 name = "glob_integration"
 path = "src/commands/glob/tests/integration/main.rs"
+
+[[test]]
+name = "read_integration"
+path = "src/commands/read/tests/integration/main.rs"

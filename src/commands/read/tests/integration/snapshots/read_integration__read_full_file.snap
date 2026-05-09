@@ -1,0 +1,7 @@
+---
+source: src/commands/read/tests/integration/main.rs
+expression: stdout
+---
+1: line one
+2: line two
+3: line three

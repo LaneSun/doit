@@ -1,0 +1,7 @@
+---
+source: src/commands/read/tests/integration/main.rs
+expression: stdout
+---
+2: b
+3: c
+4: d
