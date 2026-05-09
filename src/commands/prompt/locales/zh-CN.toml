@@ -1,0 +1,22 @@
+[prompt]
+not_available = "doit prompt 仅在交互模式下可用"
+skill = """
+阻塞等待用户输入。
+
+用法：
+  doit prompt '<消息>'
+  doit prompt <<'EOF'
+多行消息第一行
+多行消息第二行
+EOF
+
+输出：
+  > {用户输入}
+  > <ENTER>
+
+场景：
+  LLM 调用 prompt 向用户提问或请求确认。此命令阻塞直到用户响应，
+  然后返回用户输入作为输出。
+
+仅在交互模式下可用。
+"""

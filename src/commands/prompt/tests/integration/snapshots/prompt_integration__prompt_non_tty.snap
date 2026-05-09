@@ -1,0 +1,5 @@
+---
+source: src/commands/prompt/tests/integration/main.rs
+expression: stderr
+---
+doit prompt is only available in interactive mode

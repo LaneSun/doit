@@ -13,6 +13,7 @@ rust_i18n::i18n!("locales");
 #[tokio::main]
 async fn main() -> Result<()> {
     let ctx = RuntimeContext {
+        stdin_is_tty: std::io::stdin().is_terminal(),
         stderr_is_tty: std::io::stderr().is_terminal(),
         locale: detect_locale(),
     };
@@ -34,6 +35,7 @@ async fn main() -> Result<()> {
 
     match cli.command {
         None => commands::interactive::execute(&ctx, &commands::interactive::Args {}).await,
+        Some(Command::Prompt(args)) => commands::prompt::execute(&ctx, &args).await,
         Some(Command::Interactive(args)) => commands::interactive::execute(&ctx, &args).await,
         Some(Command::Run(args)) => commands::run::execute(&ctx, &args).await,
         Some(Command::Task(args)) => commands::task::execute(&ctx, &args).await,
