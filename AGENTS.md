@@ -89,6 +89,8 @@ Note: jj automatically syncs with the underlying git repo, so git-compatible ope
 
 决不跳过或合并步骤。
 
+简化流程：当设计已确认时，可直接进行「编码实现」然后交由用户审计。
+
 ### 编码阶段顺序
 
 按依赖关系从下到上：
