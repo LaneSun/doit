@@ -43,6 +43,7 @@ async fn main() -> Result<()> {
         Some(Command::Interactive(args)) => commands::interactive::execute(&ctx, &args).await,
         Some(Command::Run(args)) => commands::run::execute(&ctx, &args).await,
         Some(Command::Task(args)) => commands::task::execute(&ctx, &args).await,
+        Some(Command::Write(args)) => commands::write::execute(&ctx, &args).await,
         Some(Command::Resume(args)) => commands::resume::execute(&ctx, &args).await,
     }
 }

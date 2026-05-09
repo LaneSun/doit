@@ -1,0 +1,24 @@
+[write]
+skill = """
+Write content to a file. Content is read from stdin (pipe or heredoc).
+
+Usage:
+  doit write '<file>' <<'EOF'
+<content>
+EOF
+  doit write --append '<file>' <<'EOF'
+<content>
+EOF
+
+Parameters:
+  file     - Target file path
+  --append - Append to file instead of overwriting
+  --mode   - File permission mode in octal (e.g. "0o644")
+
+Output:
+  (none on success)
+
+Scenario:
+  The LLM uses write to create or modify files. Writes are atomic
+  (tmp file + rename), preventing corruption on interrupt.
+"""

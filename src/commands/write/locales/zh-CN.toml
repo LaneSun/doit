@@ -1,0 +1,24 @@
+[write]
+skill = """
+将内容写入文件。内容从 stdin 读取（管道或 heredoc）。
+
+用法：
+  doit write '<文件>' <<'EOF'
+<内容>
+EOF
+  doit write --append '<文件>' <<'EOF'
+<内容>
+EOF
+
+参数：
+  file     - 目标文件路径
+  --append - 追加而非覆盖
+  --mode   - 文件权限模式（八进制，如 "0o644"）
+
+输出：
+  （成功时无输出）
+
+场景：
+  LLM 使用 write 创建或修改文件。写入是原子操作（临时文件 + rename），
+  防止中断时文件损坏。
+"""

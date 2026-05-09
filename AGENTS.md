@@ -132,6 +132,56 @@ Note: jj automatically syncs with the underlying git repo, so git-compatible ope
 
 ---
 
+## Coding Conventions
+
+### 子命令结构
+
+每个内置子命令位于 `src/commands/<name>/`，包含：
+
+```
+src/commands/<name>/
+├── mod.rs                        # clap Args + execute 函数
+├── locales/
+│   ├── en.toml                   # 英文翻译
+│   └── zh-CN.toml                # 中文翻译
+└── tests/
+    └── integration/
+        ├── main.rs               # 集成测试 (insta golden file)
+        └── snapshots/            # 生成，不入版本控制
+```
+
+命令行注册流程：
+1. 创建 `src/commands/<name>/` 目录和文件
+2. `src/commands/mod.rs` 添加 `pub mod <name>;`
+3. `src/cli.rs` 的 `Command` 枚举添加变体
+4. `src/main.rs` 的 `match` 添加分发分支
+5. `Cargo.toml` 添加 `[[test]]` 条目
+6. `locales/en.toml` 和 `zh-CN.toml` 添加翻译 key
+
+### i18n 规范
+
+- 每个子命令的翻译 key 以其命令名为前缀：`prompt.skill`、`exit.skill`、`read.truncated`
+- 子命令 locale 源文件位于 `src/commands/<name>/locales/`，`build.rs` 在编译时自动合并到 `locales/`
+- `locales/` 目录由 build.rs 生成，已加入 `.gitignore`
+- 基础翻译（`tracing.startup`）位于 `src/locales/`
+
+### 测试规范
+
+- 集成测试为主，使用 `assert_cmd` + `insta` golden file
+- 测试文件位于各子命令的 `tests/integration/` 下
+- 通用集成测试位于 `tests/integration/`
+- 测试中固定 `LANG=en_US.UTF-8` 以锁定英文输出
+- insta snapshots 由 `cargo insta accept` 管理
+
+### 子命令约定
+
+- 所有子命令接受 `--skill` 参数，输出 i18n 化的技能参考文本给 LLM
+- 文件操作类子命令输出带行号的格式：`<行号>: <内容>`（冒号后有空格）
+- 搜索类子命令输出格式：`<文件>:<行号>: <内容>`
+- 大量输出需设置默认截断上限，并给出用户友好提示
+
+---
+
 ## 设计文档
 
 完整的设计文档位于 `DESIGN.md`。任何架构决策必须反映在设计文档中。
