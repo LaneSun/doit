@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 clap = { version = "4.6.1", features = ["derive"] }
+glob = "0.3.3"
 miette = { version = "7.6.0", features = ["fancy"] }
 rust-i18n = "4.0.0"
 rustyline = "18.0.0"
@@ -19,6 +20,7 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 assert_cmd = "2.2.1"
 insta = { version = "1.47.2", features = ["json", "filters"] }
 regex = "1.12.3"
+tempfile = "3.27.0"
 
 [[test]]
 name = "prompt_integration"
@@ -27,3 +29,7 @@ path = "src/commands/prompt/tests/integration/main.rs"
 [[test]]
 name = "exit_integration"
 path = "src/commands/exit/tests/integration/main.rs"
+
+[[test]]
+name = "glob_integration"
+path = "src/commands/glob/tests/integration/main.rs"

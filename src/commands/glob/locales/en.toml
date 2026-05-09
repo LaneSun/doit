@@ -1,0 +1,19 @@
+[glob]
+skill = """
+File pattern matching. Finds files matching a glob pattern.
+
+Usage:
+  doit glob '<pattern>'
+  doit glob --cwd <dir> '<pattern>'
+
+Parameters:
+  pattern  - Glob pattern (e.g. "*.rs", "src/**/*.rs")
+  --cwd    - Base directory (defaults to current directory)
+
+Output:
+  One file path per line, relative to the base directory.
+
+Scenario:
+  The LLM uses glob to discover files matching a pattern before
+  operating on them. Faster and more reliable than find or ls patterns.
+"""

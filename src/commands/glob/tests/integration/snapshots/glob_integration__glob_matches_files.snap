@@ -1,0 +1,7 @@
+---
+source: src/commands/glob/tests/integration/main.rs
+expression: "lines.join(\"\\n\")"
+---
+a.rs
+b.rs
+sub/c.rs

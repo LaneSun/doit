@@ -274,6 +274,7 @@ version = "0.1.0"
 dependencies = [
  "assert_cmd",
  "clap",
+ "glob",
  "insta",
  "miette",
  "regex",
@@ -281,6 +282,7 @@ dependencies = [
  "rustyline",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
  "tokio",
  "tracing",

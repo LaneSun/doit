@@ -36,6 +36,7 @@ async fn main() -> Result<()> {
     match cli.command {
         None => commands::interactive::execute(&ctx, &commands::interactive::Args {}).await,
         Some(Command::Exit(args)) => commands::exit::execute(&ctx, &args).await,
+        Some(Command::Glob(args)) => commands::glob::execute(&ctx, &args).await,
         Some(Command::Prompt(args)) => commands::prompt::execute(&ctx, &args).await,
         Some(Command::Interactive(args)) => commands::interactive::execute(&ctx, &args).await,
         Some(Command::Run(args)) => commands::run::execute(&ctx, &args).await,

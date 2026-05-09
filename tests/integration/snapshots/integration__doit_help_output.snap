@@ -9,6 +9,7 @@ Usage: doit [COMMAND]
 Commands:
   interactive  Start interactive REPL mode
   exit         Complete the current task and exit
+  glob         File pattern matching
   prompt       Block waiting for user input
   run          Execute a one-shot task (turn-by-turn display)
   task         Execute a task as sub-agent (non-interactive, result only)
