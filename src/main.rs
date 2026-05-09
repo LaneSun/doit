@@ -39,6 +39,7 @@ async fn main() -> Result<()> {
         Some(Command::Glob(args)) => commands::glob::execute(&ctx, &args).await,
         Some(Command::Prompt(args)) => commands::prompt::execute(&ctx, &args).await,
         Some(Command::Read(args)) => commands::read::execute(&ctx, &args).await,
+        Some(Command::Search(args)) => commands::search::execute(&ctx, &args).await,
         Some(Command::Interactive(args)) => commands::interactive::execute(&ctx, &args).await,
         Some(Command::Run(args)) => commands::run::execute(&ctx, &args).await,
         Some(Command::Task(args)) => commands::task::execute(&ctx, &args).await,

@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 
-use crate::commands::{exit, glob, interactive, prompt, read, run, task, resume};
+use crate::commands::{exit, glob, interactive, prompt, read, run, search, task, resume};
 
 #[derive(Parser)]
 #[command(
@@ -25,6 +25,8 @@ pub enum Command {
     Prompt(prompt::Args),
     /// Read file contents with line numbers
     Read(read::Args),
+    /// Search file contents with regex
+    Search(search::Args),
     /// Execute a one-shot task (turn-by-turn display)
     Run(run::Args),
     /// Execute a task as sub-agent (non-interactive, result only)

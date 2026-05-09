@@ -1,0 +1,5 @@
+---
+source: src/commands/search/tests/integration/main.rs
+expression: stdout
+---
+No matches found.

@@ -1,0 +1,25 @@
+[search]
+skill = """
+使用正则表达式搜索文件内容。每条匹配以 '<文件>:<行号>: ' 为前缀。
+
+用法：
+  doit search '<模式>'
+  doit search --include '*.rs' '<模式>'
+  doit search --cwd <目录> --include '*.rs' '<模式>'
+
+参数：
+  pattern   - 正则表达式模式
+  --include - 文件 glob 过滤器（如 "*.rs"、"*.toml"），可多次指定
+  --cwd     - 基础目录（默认为当前目录）
+
+输出：
+  每条匹配行以 '<文件>:<行号>: ' 为前缀。
+  超过 500 条时截断并显示提示。
+
+场景：
+  LLM 使用 search 在文件中查找模式。比 find + grep 更高效。
+"""
+
+no_matches = "未找到匹配项。"
+
+truncated = "... [截断: 结果已限制为 500 条匹配, 请使用 --include 或更精确的模式]"

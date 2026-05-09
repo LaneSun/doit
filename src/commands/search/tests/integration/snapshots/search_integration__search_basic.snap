@@ -1,0 +1,6 @@
+---
+source: src/commands/search/tests/integration/main.rs
+expression: "lines.join(\"\\n\")"
+---
+a.rs:1: fn main() {
+a.rs:4: fn foo() {}

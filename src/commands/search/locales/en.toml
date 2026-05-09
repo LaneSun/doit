@@ -1,0 +1,27 @@
+[search]
+skill = """
+Search file contents with regular expressions. Each match prefixed with
+'<file>:<line>: ' (space after colon).
+
+Usage:
+  doit search '<pattern>'
+  doit search --include '*.rs' '<pattern>'
+  doit search --cwd <dir> --include '*.rs' '<pattern>'
+
+Parameters:
+  pattern   - Regular expression pattern
+  --include - File glob filter (e.g. "*.rs", "*.toml"). Repeatable.
+  --cwd     - Base directory (defaults to current directory)
+
+Output:
+  Each matching line prefixed with '<file>:<line>: '.
+  Truncated at 500 matches with a notice.
+
+Scenario:
+  The LLM uses search to find patterns across files. More efficient
+  than chaining find and grep.
+"""
+
+no_matches = "No matches found."
+
+truncated = "... [truncated: results limited to 500 matches, use --include or a narrower pattern]"
