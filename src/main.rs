@@ -1,9 +1,13 @@
-use doit::error::Result;
 use std::io::IsTerminal;
+
+use doit::context::RuntimeContext;
+use doit::error::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let is_tty = std::io::stderr().is_terminal();
+    let ctx = RuntimeContext {
+        stderr_is_tty: std::io::stderr().is_terminal(),
+    };
 
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -11,7 +15,7 @@ async fn main() -> Result<()> {
                 .unwrap_or_else(|_| "doit=info".into()),
         )
         .with_writer(std::io::stderr)
-        .with_ansi(is_tty)
+        .with_ansi(ctx.stderr_is_tty)
         .try_init()
         .expect("failed to initialize tracing subscriber");
 
