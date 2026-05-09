@@ -1,5 +1,8 @@
 use std::io::IsTerminal;
 
+use clap::Parser;
+use doit::cli::{Cli, Command};
+use doit::commands;
 use doit::context::RuntimeContext;
 use doit::error::Result;
 use doit::i18n::detect_locale;
@@ -27,5 +30,13 @@ async fn main() -> Result<()> {
 
     tracing::info!("{}", t!("tracing.startup"));
 
-    Ok(())
+    let cli = Cli::parse();
+
+    match cli.command {
+        None => commands::interactive::execute(&ctx, &commands::interactive::Args {}).await,
+        Some(Command::Interactive(args)) => commands::interactive::execute(&ctx, &args).await,
+        Some(Command::Run(args)) => commands::run::execute(&ctx, &args).await,
+        Some(Command::Task(args)) => commands::task::execute(&ctx, &args).await,
+        Some(Command::Resume(args)) => commands::resume::execute(&ctx, &args).await,
+    }
 }
