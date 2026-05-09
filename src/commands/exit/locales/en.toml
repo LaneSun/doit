@@ -1,0 +1,20 @@
+[exit]
+skill = """
+Complete the current task and exit.
+
+Usage:
+  doit exit '<summary>'
+  doit exit <<'EOF'
+multiline summary line 1
+multiline summary line 2
+EOF
+
+Output:
+  (none)
+
+Scenario:
+  The LLM calls exit when the task is complete and there is nothing more to do.
+  The summary is passed to the parent agent loop for reporting to the user.
+
+Only available in non-interactive mode (doit run / doit task).
+"""

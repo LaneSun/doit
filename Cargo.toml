@@ -23,3 +23,7 @@ regex = "1.12.3"
 [[test]]
 name = "prompt_integration"
 path = "src/commands/prompt/tests/integration/main.rs"
+
+[[test]]
+name = "exit_integration"
+path = "src/commands/exit/tests/integration/main.rs"

@@ -1,4 +1,4 @@
-rust_i18n::i18n!("src/commands/prompt/locales");
+rust_i18n::i18n!("locales");
 
 pub mod cli;
 pub mod commands;
