@@ -1,0 +1,25 @@
+---
+source: src/commands/exec/tests/integration/main.rs
+expression: stdout
+---
+line 1
+line 2
+line 3
+line 4
+line 5
+line 6
+line 7
+line 8
+line 9
+line 10
+... [truncated: output exceeds limits] [use --no-truncate to see full output]
+line 191
+line 192
+line 193
+line 194
+line 195
+line 196
+line 197
+line 198
+line 199
+line 200

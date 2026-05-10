@@ -1,0 +1,24 @@
+[exec]
+skill = """
+Execute a shell command via PTY. Output is truncated by default.
+
+Usage:
+  doit exec -- <command> [args...]
+  doit exec --no-truncate -- <command> [args...]
+
+Parameters:
+  --no-truncate       - Disable output truncation
+  --truncate-chars N  - Max chars for head/tail (default: 2000)
+  --truncate-lines N  - Max lines for head/tail (default: 50)
+
+Output:
+  Stdout and stderr merged, truncated at head+tail with ANSI preserved.
+  Truncation notice appears between head and tail output.
+
+Scenario:
+  The LLM uses exec to run arbitrary shell commands. Implicit wrapping
+  ensures output is bounded.
+"""
+
+truncated = "truncated: output exceeds limits"
+truncated_hint = "use --no-truncate to see full output"

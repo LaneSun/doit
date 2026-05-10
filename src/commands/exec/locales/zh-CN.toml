@@ -1,0 +1,23 @@
+[exec]
+skill = """
+通过 PTY 执行 Shell 命令。默认对输出进行截断。
+
+用法：
+  doit exec -- <命令> [参数...]
+  doit exec --no-truncate -- <命令> [参数...]
+
+参数：
+  --no-truncate       - 禁用输出截断
+  --truncate-chars N  - 头尾最大字符数（默认：2000）
+  --truncate-lines N  - 头尾最大行数（默认：50）
+
+输出：
+  stdout 和 stderr 合并，头尾截断，保留 ANSI 格式码。
+  截断提示显示在头尾输出之间。
+
+场景：
+  LLM 使用 exec 执行任意 Shell 命令。隐式包装确保输出有界。
+"""
+
+truncated = "截断: 输出超出限制"
+truncated_hint = "使用 --no-truncate 查看完整输出"

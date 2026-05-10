@@ -51,3 +51,7 @@ path = "src/commands/write/tests/integration/main.rs"
 [[test]]
 name = "edit_integration"
 path = "src/commands/edit/tests/integration/main.rs"
+
+[[test]]
+name = "exec_integration"
+path = "src/commands/exec/tests/integration/main.rs"
