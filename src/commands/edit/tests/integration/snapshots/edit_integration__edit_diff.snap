@@ -1,0 +1,11 @@
+---
+source: src/commands/edit/tests/integration/main.rs
+expression: stdout
+---
+test.txt:1: a
+test.txt:2: b
+test.txt:3: c
+test.txt:4: D-new
+test.txt:5: e
+test.txt:6: f
+test.txt:7: g

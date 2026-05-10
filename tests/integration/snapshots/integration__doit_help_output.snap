@@ -9,6 +9,7 @@ Usage: doit [COMMAND]
 Commands:
   interactive  Start interactive REPL mode
   exit         Complete the current task and exit
+  edit         Structured file editing
   glob         File pattern matching
   prompt       Block waiting for user input
   read         Read file contents with line numbers

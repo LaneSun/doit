@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 
-use crate::commands::{exit, glob, interactive, prompt, read, run, search, task, resume, write};
+use crate::commands::{edit, exit, glob, interactive, prompt, read, run, search, task, resume, write};
 
 #[derive(Parser)]
 #[command(
@@ -19,6 +19,8 @@ pub enum Command {
     Interactive(interactive::Args),
     /// Complete the current task and exit
     Exit(exit::Args),
+    /// Structured file editing
+    Edit(edit::Args),
     /// File pattern matching
     Glob(glob::Args),
     /// Block waiting for user input

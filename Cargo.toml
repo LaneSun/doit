@@ -47,3 +47,7 @@ path = "src/commands/search/tests/integration/main.rs"
 [[test]]
 name = "write_integration"
 path = "src/commands/write/tests/integration/main.rs"
+
+[[test]]
+name = "edit_integration"
+path = "src/commands/edit/tests/integration/main.rs"

@@ -1,0 +1,7 @@
+---
+source: src/commands/edit/tests/integration/main.rs
+expression: stdout
+---
+test.txt:1: hi world
+test.txt:2: foo bar
+test.txt:3: hi again

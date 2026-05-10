@@ -1,0 +1,29 @@
+[edit]
+skill = """
+Structured file editing. Three mutually exclusive modes:
+
+1. Line replacement:
+   doit edit --lines N:M '<file>' <<'EOF'
+   <new content>
+   EOF
+
+2. Regex replacement:
+   doit edit --regex '<pattern>' --replace '<replacement>' '<file>'
+
+3. Git diff format (fixed heredoc, >= 3 context lines):
+   doit edit '<file>' <<'DIFF'
+   @@ -10,6 +10,8 @@
+    context lines (unchanged)
+   -removed lines
+   +added lines
+    more context
+   DIFF
+
+Output:
+  After editing, the affected area with surrounding context is printed in
+  search-style format: '<file>:<line>: <content>'.
+
+Scenario:
+  The LLM uses edit to make precise, structured changes.
+  Diff mode matches exactly one location (refuses ambiguous matches).
+"""
