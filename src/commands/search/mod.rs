@@ -7,7 +7,7 @@ use crate::error::Result;
 #[derive(clap::Args)]
 pub struct Args {
     /// Regular expression pattern to search for
-    pub pattern: String,
+    pub pattern: Option<String>,
 
     /// File glob to include (can be specified multiple times)
     #[arg(long, value_name = "GLOB")]
@@ -30,7 +30,12 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
         return Ok(());
     }
 
-    let re = regex::Regex::new(&args.pattern)
+    let pattern = args
+        .pattern
+        .as_ref()
+        .ok_or_else(|| crate::error::DoitError::config("missing required argument: pattern"))?;
+
+    let re = regex::Regex::new(pattern)
         .map_err(|e| crate::error::DoitError::config(format!("invalid regex: {e}")))?;
 
     let default_cwd = PathBuf::from(".");

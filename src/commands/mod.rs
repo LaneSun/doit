@@ -8,5 +8,6 @@ pub mod read;
 pub mod run;
 pub mod search;
 pub mod task;
+pub mod template;
 pub mod resume;
 pub mod write;

@@ -1,0 +1,17 @@
+[task]
+skill = """
+Execute a task as a sub-agent (non-interactive).
+
+Usage:
+  doit task '<description>'
+  doit task <<'EOF'
+multiline task description
+EOF
+
+Output:
+  The exit summary text (returned by doit exit).
+
+Scenario:
+  The LLM spawns a sub-agent to handle a subtask independently.
+  The sub-agent runs in non-interactive mode and returns its result.
+"""

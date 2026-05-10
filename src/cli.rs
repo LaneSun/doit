@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 
-use crate::commands::{edit, exec, exit, glob, interactive, prompt, read, run, search, task, resume, write};
+use crate::commands::{edit, exec, exit, glob, interactive, prompt, read, run, search, task, template, resume, write};
 
 #[derive(Parser)]
 #[command(
@@ -35,6 +35,8 @@ pub enum Command {
     Run(run::Args),
     /// Execute a task as sub-agent (non-interactive, result only)
     Task(task::Args),
+    /// Generate prompt templates
+    Template(template::Args),
     /// Write content to a file (reads from stdin)
     Write(write::Args),
     /// Resume a previous session

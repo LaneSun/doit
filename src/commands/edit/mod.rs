@@ -8,7 +8,7 @@ use crate::error::Result;
 #[derive(clap::Args)]
 pub struct Args {
     /// Target file to edit
-    pub file: PathBuf,
+    pub file: Option<PathBuf>,
 
     /// Line range to replace (e.g. "10:15"), 1-indexed, inclusive
     #[arg(long, value_name = "N:M", conflicts_with_all = ["regex", "replace"])]
@@ -35,10 +35,15 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
         return Ok(());
     }
 
-    let original = fs::read_to_string(&args.file)
-        .map_err(|e| crate::error::DoitError::io(e, format!("cannot read {}", args.file.display())))?;
+    let file = args
+        .file
+        .as_ref()
+        .ok_or_else(|| crate::error::DoitError::config("missing required argument: file"))?;
+
+    let original = fs::read_to_string(file)
+        .map_err(|e| crate::error::DoitError::io(e, format!("cannot read {}", file.display())))?;
     let original_lines: Vec<&str> = original.lines().collect();
-    let file_name = args.file.display().to_string();
+    let file_name = file.display().to_string();
 
     if let Some(range) = &args.lines {
         let (start, end) = parse_range(range)?;
@@ -48,7 +53,7 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
             .map_err(|e| crate::error::DoitError::io(e, "failed to read stdin"))?;
         let new_content = stdin.trim_end().to_string();
         let (result_lines, changed_len) =
-            do_line_replace(&original_lines, start, end, &new_content, &args.file)?;
+            do_line_replace(&original_lines, start, end, &new_content, file)?;
         let ctx_start = start.saturating_sub(CONTEXT);
         let ctx_end = (start + changed_len + CONTEXT).min(result_lines.len());
         for i in ctx_start..ctx_end {
@@ -58,7 +63,7 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
     {
         let re = regex::Regex::new(pattern)
             .map_err(|e| crate::error::DoitError::config(format!("invalid regex: {e}")))?;
-        let result = do_regex_replace(&original_lines, &re, replacement, &args.file)?;
+        let result = do_regex_replace(&original_lines, &re, replacement, file)?;
         // Collect and merge changed ranges
         let mut ranges: Vec<(usize, usize)> = Vec::new();
         for (i, (old, new)) in original_lines.iter().zip(result.iter()).enumerate() {
@@ -89,7 +94,7 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
             .read_to_string(&mut stdin)
             .map_err(|e| crate::error::DoitError::io(e, "failed to read stdin"))?;
         let (result_lines, changed_start, changed_len) =
-            do_diff_replace(&original_lines, &stdin, &args.file)?;
+            do_diff_replace(&original_lines, &stdin, file)?;
         let ctx_start = changed_start.saturating_sub(CONTEXT);
         let ctx_end = (changed_start + changed_len + CONTEXT).min(result_lines.len());
         for i in ctx_start..ctx_end {

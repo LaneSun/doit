@@ -17,6 +17,7 @@ Commands:
   search       Search file contents with regex
   run          Execute a one-shot task (turn-by-turn display)
   task         Execute a task as sub-agent (non-interactive, result only)
+  template     Generate prompt templates
   write        Write content to a file (reads from stdin)
   resume       Resume a previous session
   help         Print this message or the help of the given subcommand(s)

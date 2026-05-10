@@ -22,7 +22,7 @@ pub struct Args {
     pub skill: bool,
 
     /// Shell command to execute (everything after --)
-    #[arg(trailing_var_arg = true, required = true)]
+    #[arg(trailing_var_arg = true)]
     pub command: Vec<String>,
 }
 

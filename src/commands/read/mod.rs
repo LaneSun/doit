@@ -7,7 +7,7 @@ use crate::error::Result;
 #[derive(clap::Args)]
 pub struct Args {
     /// File to read
-    pub file: PathBuf,
+    pub file: Option<PathBuf>,
 
     /// Line range (e.g. "10:15"), 1-indexed, inclusive. Disables default truncation.
     #[arg(long, value_name = "N:M")]
@@ -24,8 +24,13 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
         return Ok(());
     }
 
-    let content = fs::read_to_string(&args.file)
-        .map_err(|e| crate::error::DoitError::io(e, format!("cannot open {}", args.file.display())))?;
+    let file = args
+        .file
+        .as_ref()
+        .ok_or_else(|| crate::error::DoitError::config("missing required argument: file"))?;
+
+    let content = fs::read_to_string(file)
+        .map_err(|e| crate::error::DoitError::io(e, format!("cannot open {}", file.display())))?;
     let all_lines: Vec<&str> = content.lines().collect();
     let total = all_lines.len();
 

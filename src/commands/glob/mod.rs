@@ -6,7 +6,7 @@ use crate::error::Result;
 #[derive(clap::Args)]
 pub struct Args {
     /// Glob pattern (e.g. "src/**/*.rs")
-    pub pattern: String,
+    pub pattern: Option<String>,
 
     /// Base directory for matching (defaults to current directory)
     #[arg(long)]
@@ -23,9 +23,14 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
         return Ok(());
     }
 
+    let pattern_str = args
+        .pattern
+        .as_ref()
+        .ok_or_else(|| crate::error::DoitError::config("missing required argument: pattern"))?;
+
     let default_cwd = PathBuf::from(".");
     let cwd = args.cwd.as_deref().unwrap_or(&default_cwd);
-    let pattern = cwd.join(&args.pattern);
+    let pattern = cwd.join(pattern_str);
     let pattern_str = pattern.to_string_lossy();
 
     for entry in glob::glob(&pattern_str)

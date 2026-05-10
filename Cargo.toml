@@ -55,3 +55,7 @@ path = "src/commands/edit/tests/integration/main.rs"
 [[test]]
 name = "exec_integration"
 path = "src/commands/exec/tests/integration/main.rs"
+
+[[test]]
+name = "template_integration"
+path = "src/commands/template/tests/integration/main.rs"
