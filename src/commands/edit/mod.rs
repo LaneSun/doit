@@ -59,7 +59,8 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
         for i in ctx_start..ctx_end {
             println!("{}:{}: {}", file_name, i + 1, result_lines[i]);
         }
-    } else if let (Some(pattern), Some(replacement)) = (args.regex.as_deref(), args.replace.as_deref())
+    } else if let (Some(pattern), Some(replacement)) =
+        (args.regex.as_deref(), args.replace.as_deref())
     {
         let re = regex::Regex::new(pattern)
             .map_err(|e| crate::error::DoitError::config(format!("invalid regex: {e}")))?;
@@ -106,9 +107,9 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
 }
 
 fn parse_range(s: &str) -> Result<(usize, usize)> {
-    let (a, b) = s.split_once(':').ok_or_else(|| {
-        crate::error::DoitError::config(format!("invalid range: {s}"))
-    })?;
+    let (a, b) = s
+        .split_once(':')
+        .ok_or_else(|| crate::error::DoitError::config(format!("invalid range: {s}")))?;
     let start: usize = a
         .parse()
         .map_err(|_| crate::error::DoitError::config(format!("invalid start: {a}")))?;
@@ -116,7 +117,9 @@ fn parse_range(s: &str) -> Result<(usize, usize)> {
         .parse()
         .map_err(|_| crate::error::DoitError::config(format!("invalid end: {b}")))?;
     if start < 1 || end < 1 || start > end {
-        return Err(crate::error::DoitError::config(format!("invalid range: {s}")));
+        return Err(crate::error::DoitError::config(format!(
+            "invalid range: {s}"
+        )));
     }
     Ok((start, end))
 }
@@ -139,7 +142,11 @@ fn do_line_replace(
     let new_lines: Vec<&str> = new_content.lines().collect();
     let changed_len = new_lines.len();
 
-    let mut result: Vec<String> = lines.iter().take(start - 1).map(|s| s.to_string()).collect();
+    let mut result: Vec<String> = lines
+        .iter()
+        .take(start - 1)
+        .map(|s| s.to_string())
+        .collect();
     for nl in &new_lines {
         result.push(nl.to_string());
     }
@@ -216,7 +223,7 @@ fn do_diff_replace(
         )));
     }
 
-    // Search: match context_before + to_remove  
+    // Search: match context_before + to_remove
     let search: Vec<&str> = context_before
         .iter()
         .chain(to_remove.iter())
@@ -249,7 +256,11 @@ fn do_diff_replace(
     let changed_len = to_add.len();
 
     // Build new file
-    let mut result: Vec<String> = lines.iter().take(remove_start).map(|s| s.to_string()).collect();
+    let mut result: Vec<String> = lines
+        .iter()
+        .take(remove_start)
+        .map(|s| s.to_string())
+        .collect();
     for add in &to_add {
         result.push(add.clone());
     }

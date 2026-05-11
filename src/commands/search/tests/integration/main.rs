@@ -14,7 +14,11 @@ fn run_doit(args: &[&str], tmp: &tempfile::TempDir) -> String {
 #[test]
 fn search_basic() {
     let tmp = tempfile::tempdir().unwrap();
-    fs::write(tmp.path().join("a.rs"), "fn main() {\n    hello()\n}\nfn foo() {}\n").unwrap();
+    fs::write(
+        tmp.path().join("a.rs"),
+        "fn main() {\n    hello()\n}\nfn foo() {}\n",
+    )
+    .unwrap();
     fs::write(tmp.path().join("b.txt"), "fn main() {}\nother text\n").unwrap();
 
     let stdout = run_doit(&["search", "--include", "*.rs", "fn "], &tmp);

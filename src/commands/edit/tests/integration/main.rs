@@ -17,16 +17,28 @@ fn run_doit(args: &[&str], stdin: &str, tmp: &tempfile::TempDir) -> String {
 #[test]
 fn edit_lines() {
     let tmp = tempfile::tempdir().unwrap();
-    fs::write(tmp.path().join("test.txt"), "line 1\nline 2\nline 3\nline 4\nline 5\n").unwrap();
+    fs::write(
+        tmp.path().join("test.txt"),
+        "line 1\nline 2\nline 3\nline 4\nline 5\n",
+    )
+    .unwrap();
 
-    let stdout = run_doit(&["edit", "--lines", "2:3", "test.txt"], "NEW A\nNEW B\n", &tmp);
+    let stdout = run_doit(
+        &["edit", "--lines", "2:3", "test.txt"],
+        "NEW A\nNEW B\n",
+        &tmp,
+    );
     assert_snapshot!(stdout);
 }
 
 #[test]
 fn edit_regex() {
     let tmp = tempfile::tempdir().unwrap();
-    fs::write(tmp.path().join("test.txt"), "hello world\nfoo bar\nhello again\n").unwrap();
+    fs::write(
+        tmp.path().join("test.txt"),
+        "hello world\nfoo bar\nhello again\n",
+    )
+    .unwrap();
 
     let stdout = run_doit(
         &["edit", "--regex", "hello", "--replace", "hi", "test.txt"],

@@ -41,8 +41,6 @@ fn read_input() -> Result<String> {
     match rl.readline("> ") {
         Ok(line) => Ok(line.trim().to_string()),
         Err(rustyline::error::ReadlineError::Interrupted) => Ok(String::new()),
-        Err(e) => Err(crate::error::DoitError::shell(format!(
-            "readline: {e}"
-        ))),
+        Err(e) => Err(crate::error::DoitError::shell(format!("readline: {e}"))),
     }
 }

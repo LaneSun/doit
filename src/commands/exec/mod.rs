@@ -68,7 +68,8 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
             let tail = build_tail(&lines, max_lines, max_chars);
 
             println!("{}", head);
-            println!("\x1b[0m... [{}] [{}]",
+            println!(
+                "\x1b[0m... [{}] [{}]",
                 rust_i18n::t!("exec.truncated"),
                 rust_i18n::t!("exec.truncated_hint")
             );

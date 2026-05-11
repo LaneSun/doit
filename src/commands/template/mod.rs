@@ -21,7 +21,7 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
             return Err(crate::error::DoitError::config(format!(
                 "unknown template type: {}",
                 args.template_type
-            )))
+            )));
         }
     };
 

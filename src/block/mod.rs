@@ -7,15 +7,9 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "role")]
 pub enum Block {
     #[serde(rename = "system")]
-    System {
-        seq: u64,
-        content: String,
-    },
+    System { seq: u64, content: String },
     #[serde(rename = "user")]
-    User {
-        seq: u64,
-        content: String,
-    },
+    User { seq: u64, content: String },
     #[serde(rename = "assistant")]
     Assistant {
         seq: u64,

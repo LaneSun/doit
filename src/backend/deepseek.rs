@@ -1,5 +1,5 @@
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::types::{ChatMessage, ChatResponse, Role};
 use crate::error::Result;
@@ -22,10 +22,7 @@ impl DeepSeekBackend {
     }
 
     pub async fn chat(&self, messages: &[ChatMessage]) -> Result<ChatResponse> {
-        let api_messages: Vec<Value> = messages
-            .iter()
-            .map(|m| self.build_api_message(m))
-            .collect();
+        let api_messages: Vec<Value> = messages.iter().map(|m| self.build_api_message(m)).collect();
 
         let body = json!({
             "model": self.model,
@@ -122,15 +119,13 @@ impl DeepSeekBackend {
                 let func = &tc["function"];
                 return Ok(ChatResponse {
                     reasoning,
-                    cmd: func["arguments"]
-                        .as_str()
-                        .map(|args| {
-                            if let Ok(v) = serde_json::from_str::<Value>(args) {
-                                v["command"].as_str().unwrap_or(args).to_string()
-                            } else {
-                                args.to_string()
-                            }
-                        }),
+                    cmd: func["arguments"].as_str().map(|args| {
+                        if let Ok(v) = serde_json::from_str::<Value>(args) {
+                            v["command"].as_str().unwrap_or(args).to_string()
+                        } else {
+                            args.to_string()
+                        }
+                    }),
                     tool_call_id: tc["id"].as_str().map(|s| s.to_string()),
                     content: None,
                     is_prompt: false,

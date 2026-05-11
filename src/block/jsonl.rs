@@ -15,15 +15,13 @@ pub fn append(path: &Path, block: &Block) -> Result<()> {
 
     let line = serde_json::to_string(block)
         .map_err(|e| crate::error::DoitError::session(format!("serialize: {e}")))?;
-    writeln!(file, "{}", line)
-        .map_err(|e| crate::error::DoitError::io(e, "cannot write JSONL"))?;
+    writeln!(file, "{}", line).map_err(|e| crate::error::DoitError::io(e, "cannot write JSONL"))?;
 
     Ok(())
 }
 
 pub fn load(path: &Path) -> Result<Vec<Block>> {
-    let file = File::open(path)
-        .map_err(|e| crate::error::DoitError::io(e, "cannot open JSONL"))?;
+    let file = File::open(path).map_err(|e| crate::error::DoitError::io(e, "cannot open JSONL"))?;
     let reader = BufReader::new(file);
 
     let mut blocks = Vec::new();

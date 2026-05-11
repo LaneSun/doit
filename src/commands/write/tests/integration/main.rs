@@ -28,6 +28,10 @@ fn write_append() {
     let file = tmp.path().join("out.txt");
 
     run_doit(&["write", &file.to_string_lossy()], "line 1\n", &tmp);
-    run_doit(&["write", "--append", &file.to_string_lossy()], "line 2\n", &tmp);
+    run_doit(
+        &["write", "--append", &file.to_string_lossy()],
+        "line 2\n",
+        &tmp,
+    );
     assert_eq!(fs::read_to_string(&file).unwrap(), "line 1\nline 2\n");
 }

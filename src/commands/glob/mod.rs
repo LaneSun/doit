@@ -39,9 +39,7 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
         match entry {
             Ok(path) => {
                 // Output relative path
-                let relative = path
-                    .strip_prefix(cwd)
-                    .unwrap_or(&path);
+                let relative = path.strip_prefix(cwd).unwrap_or(&path);
                 println!("{}", relative.display());
             }
             Err(e) => {

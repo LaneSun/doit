@@ -1,6 +1,6 @@
 use crate::backend::types::{ChatMessage, FunctionCall, Role, ToolCall};
 
-use super::{jsonl::strip_ansi, Block};
+use super::{Block, jsonl::strip_ansi};
 
 pub fn to_api_messages(blocks: &[Block]) -> Vec<ChatMessage> {
     blocks.iter().map(to_api_message).collect()

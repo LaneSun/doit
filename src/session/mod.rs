@@ -79,10 +79,7 @@ impl Session {
     }
 
     pub fn next_seq(&self) -> u64 {
-        self.blocks
-            .last()
-            .map(|b| b.seq() + 1)
-            .unwrap_or(1)
+        self.blocks.last().map(|b| b.seq() + 1).unwrap_or(1)
     }
 
     pub fn build_messages(&self) -> Vec<crate::backend::types::ChatMessage> {

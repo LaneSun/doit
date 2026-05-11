@@ -44,19 +44,22 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
     if args.append && file.exists() {
         let existing = fs::read_to_string(file).unwrap_or_default();
         let content = existing + &input;
-        fs::write(&tmp_path, &content)
-            .map_err(|e| crate::error::DoitError::io(e, format!("cannot write to {}", tmp_path.display())))?;
+        fs::write(&tmp_path, &content).map_err(|e| {
+            crate::error::DoitError::io(e, format!("cannot write to {}", tmp_path.display()))
+        })?;
     } else {
-        fs::write(&tmp_path, &input)
-            .map_err(|e| crate::error::DoitError::io(e, format!("cannot write to {}", tmp_path.display())))?;
+        fs::write(&tmp_path, &input).map_err(|e| {
+            crate::error::DoitError::io(e, format!("cannot write to {}", tmp_path.display()))
+        })?;
     }
 
     if let Some(mode_str) = &args.mode {
         set_mode(&tmp_path, mode_str)?;
     }
 
-    fs::rename(&tmp_path, file)
-        .map_err(|e| crate::error::DoitError::io(e, format!("cannot rename to {}", file.display())))?;
+    fs::rename(&tmp_path, file).map_err(|e| {
+        crate::error::DoitError::io(e, format!("cannot rename to {}", file.display()))
+    })?;
 
     Ok(())
 }

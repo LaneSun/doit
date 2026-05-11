@@ -1,13 +1,11 @@
 use clap::{Parser, Subcommand};
 
-use crate::commands::{edit, exec, exit, glob, interactive, prompt, read, run, search, task, template, resume, write};
+use crate::commands::{
+    edit, exec, exit, glob, interactive, prompt, read, resume, run, search, task, template, write,
+};
 
 #[derive(Parser)]
-#[command(
-    name = "doit",
-    about = "A shell-first AI agent",
-    version
-)]
+#[command(name = "doit", about = "A shell-first AI agent", version)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,
