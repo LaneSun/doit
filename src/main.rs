@@ -24,14 +24,14 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "doit=info".into()),
+                .unwrap_or_else(|_| "off".into()),
         )
         .with_writer(std::io::stderr)
         .with_ansi(ctx.stderr_is_tty)
         .try_init()
         .expect("failed to initialize tracing subscriber");
 
-    tracing::info!("{}", t!("tracing.startup"));
+    tracing::debug!("{}", t!("tracing.startup"));
 
     let cli = Cli::parse();
 

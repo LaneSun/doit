@@ -8,7 +8,7 @@ use crate::session::Session;
 pub struct Args {}
 
 pub async fn execute(ctx: &RuntimeContext, _args: &Args) -> Result<()> {
-    tracing::info!("starting interactive REPL");
+    tracing::debug!("starting interactive REPL");
 
     let api_key = std::env::var("DEEPSEEK_API_KEY")
         .unwrap_or_default();

@@ -34,6 +34,7 @@ impl DeepSeekBackend {
             "tools": [self.sh_tool_definition()],
         });
 
+        tracing::debug!("API request: {} messages", api_messages.len());
         let response = self
             .client
             .post(format!("{}/chat/completions", self.api_base))
@@ -43,6 +44,7 @@ impl DeepSeekBackend {
             .send()
             .await
             .map_err(|e| crate::error::DoitError::backend(format!("API request failed: {e}")))?;
+        tracing::debug!("API response status: {}", response.status());
 
         let raw: Value = response
             .json()

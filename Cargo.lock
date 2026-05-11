@@ -409,6 +409,7 @@ dependencies = [
  "dotenvy",
  "glob",
  "insta",
+ "libc",
  "miette",
  "portable-pty",
  "regex",
