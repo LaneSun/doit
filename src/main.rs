@@ -12,6 +12,8 @@ rust_i18n::i18n!("locales");
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let _ = dotenvy::dotenv();
+
     let ctx = RuntimeContext {
         stdin_is_tty: std::io::stdin().is_terminal(),
         stderr_is_tty: std::io::stderr().is_terminal(),
