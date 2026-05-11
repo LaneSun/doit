@@ -1,5 +1,6 @@
 rust_i18n::i18n!("locales");
 
+pub mod agent;
 pub mod backend;
 pub mod block;
 pub mod cli;
