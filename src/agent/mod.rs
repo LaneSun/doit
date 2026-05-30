@@ -127,6 +127,7 @@ impl Agent {
             session.append(Block::Assistant {
                 seq: session.next_seq(),
                 reasoning,
+                narration: String::new(),
                 cmd: String::new(),
                 tool_call_id: None,
                 content: Some(content),
@@ -135,10 +136,12 @@ impl Agent {
         }
 
         let cmd = response.cmd.clone().unwrap_or_default();
+        let narration = response.narration.clone().unwrap_or_default();
         let tool_call_id = response.tool_call_id.clone().unwrap_or_default();
         session.append(Block::Assistant {
             seq: session.next_seq(),
             reasoning,
+            narration,
             cmd: cmd.clone(),
             tool_call_id: Some(tool_call_id.clone()),
             content: None,
@@ -227,6 +230,7 @@ const RESET: &str = "\x1b[0m";
 enum BlockKind {
     Reasoning,
     Content,
+    Narration,
     Command,
 }
 
@@ -252,6 +256,11 @@ impl StreamBlock {
         match self.kind {
             BlockKind::Reasoning => GRAY.to_string(),
             BlockKind::Content => CONTENT_BG.to_string(),
+            // 概述与命令同样式(着重底色 + 宝石蓝竖条),首行符号区分:# / $
+            BlockKind::Narration => {
+                let p = if self.line_no == 0 { "# " } else { "  " };
+                format!("{CMD_BG}{CMD_BAR}▌{DEFAULT_FG}{p}")
+            }
             BlockKind::Command => {
                 let p = if self.line_no == 0 { "$ " } else { "  " };
                 format!("{CMD_BG}{CMD_BAR}▌{DEFAULT_FG}{p}")
@@ -262,7 +271,7 @@ impl StreamBlock {
     fn suffix(&self) -> &'static str {
         match self.kind {
             BlockKind::Reasoning => RESET,
-            BlockKind::Content | BlockKind::Command => "\x1b[K\x1b[0m",
+            BlockKind::Content | BlockKind::Narration | BlockKind::Command => "\x1b[K\x1b[0m",
         }
     }
 
@@ -330,6 +339,7 @@ enum CommandFilter {
 struct StreamRender {
     block: Option<StreamBlock>,
     cmd: CommandFilter,
+    narration: String, // 概述先到,缓冲至命令判定后再渲染或丢弃
 }
 
 impl StreamRender {
@@ -337,6 +347,7 @@ impl StreamRender {
         Self {
             block: None,
             cmd: CommandFilter::Inactive,
+            narration: String::new(),
         }
     }
 
@@ -345,6 +356,7 @@ impl StreamRender {
         match ev {
             StreamEvent::Reasoning(s) => self.text(BlockKind::Reasoning, s),
             StreamEvent::Content(s) => self.text(BlockKind::Content, s),
+            StreamEvent::Narration(s) => self.narration(s),
             StreamEvent::Command(s) => self.command(s),
         }
     }
@@ -357,6 +369,25 @@ impl StreamRender {
         }
         if let Some(b) = self.block.as_mut() {
             b.push(s);
+        }
+    }
+
+    /// 概述增量:先于命令到达。首次到达时收尾上一块(如 reasoning),仅缓冲不渲染,
+    /// 待命令判定后再决定渲染(普通命令)或丢弃(doit prompt)。
+    fn narration(&mut self, s: &str) {
+        if self.narration.is_empty() {
+            self.finish_block();
+        }
+        self.narration.push_str(s);
+    }
+
+    /// 把已缓冲的概述渲染为一个 # 块(与命令同样式),随后清空。
+    fn flush_narration(&mut self) {
+        if !self.narration.is_empty() {
+            let mut nb = StreamBlock::new(BlockKind::Narration);
+            nb.push(&self.narration);
+            nb.finish();
+            self.narration.clear();
         }
     }
 
@@ -390,11 +421,14 @@ impl StreamRender {
         };
         let t = buf.trim_start();
         if t == TARGET || t.starts_with("doit prompt ") {
-            self.cmd = CommandFilter::Suppressed; // doit prompt:不渲染命令行
+            // doit prompt:不渲染命令行,概述一并丢弃(消息由 doit prompt 渲染成橘块)
+            self.narration.clear();
+            self.cmd = CommandFilter::Suppressed;
         } else if TARGET.starts_with(t) {
             // 仍是 "doit prompt" 的前缀,继续缓冲等待
         } else {
-            // 普通命令:渲染已缓冲文本并转入流式
+            // 普通命令:先渲染概述行,再渲染已缓冲命令文本并转入流式
+            self.flush_narration();
             let mut block = StreamBlock::new(BlockKind::Command);
             block.push(&buf);
             self.block = Some(block);
@@ -412,11 +446,14 @@ impl StreamRender {
         // 未判定的缓冲(命令在判定前结束)按普通命令渲染
         if let CommandFilter::Buffering(buf) = &self.cmd {
             if !buf.is_empty() {
+                let buf = buf.clone();
+                self.flush_narration();
                 let mut block = StreamBlock::new(BlockKind::Command);
-                block.push(buf);
+                block.push(&buf);
                 self.block = Some(block);
             }
         }
+        self.narration.clear(); // 丢弃无对应命令的残留概述
         self.cmd = CommandFilter::Inactive;
         self.finish_block();
     }

@@ -26,6 +26,7 @@ fn to_api_message(block: &Block) -> ChatMessage {
         },
         Block::Assistant {
             reasoning,
+            narration,
             cmd,
             tool_call_id,
             content,
@@ -37,8 +38,12 @@ fn to_api_message(block: &Block) -> ChatMessage {
                     r#type: "function".to_string(),
                     function: FunctionCall {
                         name: "sh".to_string(),
-                        // 用 serde_json 安全序列化,避免 cmd 含引号/换行破坏 JSON
-                        arguments: serde_json::json!({ "command": cmd }).to_string(),
+                        // 用 serde_json 安全序列化,避免内容含引号/换行破坏 JSON
+                        arguments: serde_json::json!({
+                            "narration": narration,
+                            "command": cmd,
+                        })
+                        .to_string(),
                     },
                 }]
             });

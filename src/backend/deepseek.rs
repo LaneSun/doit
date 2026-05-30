@@ -61,6 +61,7 @@ impl DeepSeekBackend {
         let mut reasoning = String::new();
         let mut content = String::new();
         let mut args = String::new(); // 累积的工具调用参数(JSON 片段)
+        let mut narr_emitted = 0usize; // 已发出的 narration 解码长度(字节)
         let mut cmd_emitted = 0usize; // 已发出的 command 解码长度(字节)
         let mut tool_call_id: Option<String> = None;
         let mut saw_tool = false;
@@ -113,7 +114,14 @@ impl DeepSeekBackend {
                         }
                         if let Some(a) = tc["function"]["arguments"].as_str() {
                             args.push_str(a);
-                            if let Some(decoded) = decode_partial_command(&args) {
+                            // narration 先于 command 解出:概述完整后才会开始流出命令
+                            if let Some(decoded) = decode_partial_field(&args, "narration") {
+                                if decoded.len() > narr_emitted {
+                                    on_event(StreamEvent::Narration(&decoded[narr_emitted..]));
+                                    narr_emitted = decoded.len();
+                                }
+                            }
+                            if let Some(decoded) = decode_partial_field(&args, "command") {
                                 if decoded.len() > cmd_emitted {
                                     on_event(StreamEvent::Command(&decoded[cmd_emitted..]));
                                     cmd_emitted = decoded.len();
@@ -127,9 +135,11 @@ impl DeepSeekBackend {
 
         let opt = |s: String| if s.is_empty() { None } else { Some(s) };
         if saw_tool {
-            let cmd = decode_partial_command(&args).unwrap_or(args);
+            let narration = decode_partial_field(&args, "narration");
+            let cmd = decode_partial_field(&args, "command").unwrap_or_else(|| args.clone());
             Ok(ChatResponse {
                 reasoning: opt(reasoning),
+                narration,
                 cmd: Some(cmd),
                 tool_call_id,
                 content: None,
@@ -138,6 +148,7 @@ impl DeepSeekBackend {
         } else {
             Ok(ChatResponse {
                 reasoning: opt(reasoning),
+                narration: None,
                 cmd: None,
                 tool_call_id: None,
                 content: opt(content),
@@ -186,12 +197,16 @@ impl DeepSeekBackend {
                 "parameters": {
                     "type": "object",
                     "properties": {
+                        "narration": {
+                            "type": "string",
+                            "description": "One concise sentence, in the user's language, stating why you run this command and what it does. Shown to the user on a '# ' line directly above the command. Provide it before the command."
+                        },
                         "command": {
                             "type": "string",
                             "description": "The shell command to execute"
                         }
                     },
-                    "required": ["command"]
+                    "required": ["narration", "command"]
                 }
             }
         })
@@ -199,14 +214,16 @@ impl DeepSeekBackend {
 
 }
 
-/// 从增量累积的工具调用参数 JSON 中,解码出 `command` 字段当前可安全确定的前缀。
+/// 从增量累积的工具调用参数 JSON 中,解码出指定字段当前可安全确定的字符串前缀。
 ///
-/// 参数形如 `{"command": "ls -la`(可能尚未闭合)。我们定位到值的起始引号后,
-/// 逐字符解码直到遇到未转义的闭合引号或字符串结束;遇到不完整的转义序列(尾随 `\`)
-/// 则停止,保证返回值始终是最终命令的一个前缀(单调增长),可安全计算增量。
-fn decode_partial_command(args: &str) -> Option<String> {
-    let key = args.find("\"command\"")?;
-    let after_key = &args[key + "\"command\"".len()..];
+/// 参数形如 `{"narration": "...", "command": "ls -la`(可能尚未闭合)。定位到该字段
+/// 值的起始引号后,逐字符解码直到遇到未转义的闭合引号或字符串结束;遇到不完整的
+/// 转义序列(尾随 `\`)则停止,保证返回值始终是该字段最终值的一个前缀(单调增长),
+/// 可安全计算增量。
+fn decode_partial_field(args: &str, field: &str) -> Option<String> {
+    let key = format!("\"{field}\"");
+    let key_pos = args.find(&key)?;
+    let after_key = &args[key_pos + key.len()..];
     let colon = after_key.find(':')?;
     let after_colon = &after_key[colon + 1..];
     let open = after_colon.find('"')?;

@@ -35,6 +35,8 @@ pub struct FunctionCall {
 #[derive(Debug, Clone)]
 pub struct ChatResponse {
     pub reasoning: Option<String>,
+    /// 命令的行为概述(一句话,描述本次命令的理由与动作)
+    pub narration: Option<String>,
     pub cmd: Option<String>,
     pub tool_call_id: Option<String>,
     pub content: Option<String>,
@@ -47,6 +49,8 @@ pub enum StreamEvent<'a> {
     Reasoning(&'a str),
     /// 对话内容增量(橘色块显示)
     Content(&'a str),
+    /// 命令行为概述增量(一句话,渲染为命令上方的 # 行,与命令同样式)
+    Narration(&'a str),
     /// 命令增量(从工具调用参数中实时解码出的 command 字段增量)
     Command(&'a str),
 }

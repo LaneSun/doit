@@ -14,6 +14,9 @@ pub enum Block {
     Assistant {
         seq: u64,
         reasoning: String,
+        /// 命令的行为概述(一句话)。旧会话无此字段,默认空且空时不写入。
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        narration: String,
         cmd: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         tool_call_id: Option<String>,
