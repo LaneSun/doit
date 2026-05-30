@@ -17,6 +17,8 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
         return Ok(());
     }
 
-    // TODO: pass summary to parent agent loop
+    if let Some(summary) = &args.summary {
+        println!("{summary}");
+    }
     Ok(())
 }

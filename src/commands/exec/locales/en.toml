@@ -1,24 +1,29 @@
 [exec]
 skill = """
-Execute a shell command via PTY. Output is truncated by default.
+Wrap a command for bounded, controlled output. Runs in an inner PTY so colors
+and formatting match the real terminal.
 
 Usage:
-  doit exec -- <command> [args...]
-  doit exec --no-truncate -- <command> [args...]
+  doit exec -- <command> [args...]               # capture + truncate (head/tail)
+  doit exec --no-truncate -- <command> [args...]  # capture, no truncation
+  doit exec --raw -- <command> [args...]          # interactive/TUI (vim, top): pass through, summary only
 
 Parameters:
   --no-truncate       - Disable output truncation
+  --raw               - Inherit the terminal directly; for interactive/full-screen programs
   --truncate-chars N  - Max chars for head/tail (default: 2000)
   --truncate-lines N  - Max lines for head/tail (default: 50)
 
 Output:
-  Stdout and stderr merged, truncated at head+tail with ANSI preserved.
-  Truncation notice appears between head and tail output.
+  Normal mode buffers output, prints head+tail with a truncation notice in
+  between, and saves the full output to a log file. Raw mode runs the program
+  live on the terminal and returns a one-line summary.
 
 Scenario:
-  The LLM uses exec to run arbitrary shell commands. Implicit wrapping
-  ensures output is bounded.
+  Use exec when you want bounded output or to run an interactive/TUI program.
+  Plain commands can be run directly without exec.
 """
 
-truncated = "truncated: output exceeds limits"
-truncated_hint = "use --no-truncate to see full output"
+truncated_notice = "truncated: %{omitted} more lines hidden, full output: %{path}"
+fullscreen_summary = "interactive program ran (fullscreen)"
+raw_summary = "interactive program ran"

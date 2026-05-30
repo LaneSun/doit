@@ -1,22 +1,16 @@
-use std::io::{self, Read, Write};
-use std::os::unix::io::AsRawFd;
+pub mod shell;
+
 use std::process::Command as StdCommand;
-use std::sync::{Arc, Mutex};
-use std::thread;
 
 use crate::backend::DeepSeekBackend;
 use crate::block::Block;
 use crate::context::RuntimeContext;
 use crate::error::Result;
 use crate::session::Session;
+use shell::ShellSession;
 
 pub struct Agent {
     backend: DeepSeekBackend,
-}
-
-struct CommandResult {
-    output: String,
-    exit_code: i32,
 }
 
 impl Agent {
@@ -24,30 +18,29 @@ impl Agent {
         Self { backend }
     }
 
+    /// 交互模式:先 prompt 取回用户的首个请求,再进入循环让 LLM 工作。
     pub async fn run_interactive(&self, ctx: &RuntimeContext, session: &mut Session) -> Result<()> {
-        let system_content = self.generate_system_prompt(ctx, true).await?;
+        let system = self.generate_system_prompt(ctx, true).await?;
         session.append(Block::System {
             seq: session.next_seq(),
-            content: system_content,
+            content: system,
+        })?;
+        let mut shell = ShellSession::spawn(&session.dir)?;
+
+        // 先向用户取回首个输入(空输入视为直接退出)
+        let first = shell.prompt_input()?;
+        if first.is_empty() {
+            return Ok(());
+        }
+        session.append(Block::User {
+            seq: session.next_seq(),
+            content: first,
         })?;
 
-        println!("$ doit prompt");
-        io::stdout().flush().ok();
-
-        let result = tokio::task::spawn_blocking(|| pty_exec(&["doit", "prompt"]))
-            .await
-            .map_err(|_| crate::error::DoitError::shell("join"))??;
-        let user_input = result.output.trim().to_string();
-        if !user_input.is_empty() {
-            session.append(Block::User {
-                seq: session.next_seq(),
-                content: user_input,
-            })?;
-        }
-
-        self.run_loop(ctx, session).await
+        self.run_loop(session, &mut shell, true).await
     }
 
+    /// 任务模式:系统提示尾部注入任务描述,LLM 直接执行直到 `doit exit`。
     pub async fn run_task(
         &self,
         ctx: &RuntimeContext,
@@ -55,108 +48,111 @@ impl Agent {
         task: &str,
     ) -> Result<()> {
         let base = self.generate_system_prompt(ctx, false).await?;
-        let content = format!("{}\n\nTask: {task}\n\nExecute the assigned task.", base);
+        let content = format!("{base}\n\nTask: {task}\n\nExecute the assigned task.");
         session.append(Block::System {
             seq: session.next_seq(),
             content,
         })?;
-        self.run_loop(ctx, session).await
+        let mut shell = ShellSession::spawn(&session.dir)?;
+        self.run_loop(session, &mut shell, false).await
     }
 
-    async fn run_loop(&self, _ctx: &RuntimeContext, session: &mut Session) -> Result<()> {
+    /// 核心循环:send → parse → execute → repeat。
+    ///
+    /// LLM 的响应分两类:
+    /// - 工具调用(sh)→ 直接命令执行,结果配对为 Tool block(满足 API 的 tool_call 配对约束);
+    /// - 自由文本(无工具调用)→ 在交互模式下转换为一次 doit prompt 向用户取输入。
+    async fn run_loop(
+        &self,
+        session: &mut Session,
+        shell: &mut ShellSession,
+        interactive: bool,
+    ) -> Result<()> {
         loop {
             let messages = session.build_messages();
             let response = self.backend.chat(&messages).await?;
+            let reasoning = response.reasoning.clone().unwrap_or_default();
 
-            // Parse response
-            let (cmd, reasoning, raw_content, tool_call_id, is_prompt) = if response.is_prompt {
-                let c = response.content.as_deref().unwrap_or("").to_string();
-                (
-                    "doit prompt".to_string(),
-                    response.reasoning,
-                    Some(c),
-                    None,
-                    true,
-                )
-            } else {
-                let c = response.cmd.clone().unwrap_or_default();
-                (c, response.reasoning, None, response.tool_call_id, false)
-            };
-
-            let tc_id = tool_call_id.clone();
-
-            // Display command to terminal
-            if is_prompt {
-                let c = raw_content.as_deref().unwrap_or("");
-                println!("$ doit prompt << 'EOF'");
-                println!("{c}");
-                println!("EOF");
-            } else {
-                println!("$ {cmd}");
-            }
-            io::stdout().flush().ok();
-
-            // Append assistant block
-            let assistant_block = Block::Assistant {
-                seq: session.next_seq(),
-                reasoning: reasoning.unwrap_or_default(),
-                cmd: cmd.clone(),
-                tool_call_id,
-                content: raw_content.clone(),
-            };
-            session.append(assistant_block)?;
-
-            // Exit check
-            if cmd.starts_with("doit exit") {
-                session.append(Block::Tool {
+            // —— 自由文本:LLM 在和用户对话 ——
+            if response.is_prompt {
+                let content = response.content.clone().unwrap_or_default();
+                session.append(Block::Assistant {
                     seq: session.next_seq(),
-                    output: String::new(),
-                    exit_code: 0,
-                    tool_call_id: tc_id.unwrap_or_default(),
+                    reasoning,
+                    cmd: String::new(),
+                    tool_call_id: None,
+                    content: Some(content.clone()),
                 })?;
-                break;
-            }
 
-            // Execute via PTY
-            let result = if is_prompt {
-                let c = raw_content.unwrap_or_default();
-                tokio::task::spawn_blocking(move || pty_exec(&["doit", "prompt", c.as_str()]))
-                    .await
-                    .map_err(|_| crate::error::DoitError::shell("join"))??
-            } else if cmd.starts_with("doit ") {
-                let args: Vec<String> = cmd.split_whitespace().map(|s| s.to_string()).collect();
-                let (prog, rest) = (args[0].clone(), args[1..].to_vec());
-                tokio::task::spawn_blocking(move || {
-                    let a: Vec<&str> = rest.iter().map(|s| s.as_str()).collect();
-                    pty_exec_direct(&prog, &a)
-                })
-                .await
-                .map_err(|e| crate::error::DoitError::shell("join"))??
-            } else {
-                let s = format!("sh -c '{}'", cmd.replace('\'', "'\\''"));
-                tokio::task::spawn_blocking(move || pty_exec_shell(&s))
-                    .await
-                    .map_err(|e| crate::error::DoitError::shell("join"))??
-            };
+                if !interactive {
+                    // 非交互模式无用户可问,LLM 未采取行动即结束
+                    break;
+                }
 
-            // Append result block
-            if is_prompt {
+                // 直接把 LLM 的文本打印到终端(它在和用户说话),再裸 doit prompt 取输入
+                print_to_terminal(&content);
+                let reply = shell.prompt_input()?;
+                if reply.is_empty() {
+                    break; // 用户空输入 → 结束会话
+                }
                 session.append(Block::User {
                     seq: session.next_seq(),
-                    content: result.output.trim().to_string(),
+                    content: reply,
                 })?;
-            } else {
+                continue;
+            }
+
+            // —— 工具调用:直接命令执行 ——
+            let cmd = response.cmd.clone().unwrap_or_default();
+            let tool_call_id = response.tool_call_id.clone().unwrap_or_default();
+            session.append(Block::Assistant {
+                seq: session.next_seq(),
+                reasoning,
+                cmd: cmd.clone(),
+                tool_call_id: Some(tool_call_id.clone()),
+                content: None,
+            })?;
+
+            let trimmed = cmd.trim_start();
+
+            // LLM 手工调用 doit prompt:走对话路径(由 doit prompt 自己渲染输入框),不加 $ 前缀
+            if trimmed.starts_with("doit prompt") {
+                let reply = shell.run_prompt_command(&cmd)?;
+                session.append(Block::Tool {
+                    seq: session.next_seq(),
+                    output: reply,
+                    exit_code: 0,
+                    tool_call_id,
+                })?;
+                continue;
+            }
+
+            // 其余命令:打印格式化的命令行($ + 宝石蓝竖条 + 着重底色),再执行
+            print_command(&cmd);
+
+            if trimmed.starts_with("doit exit") {
+                let result = shell.run_command(&cmd)?;
                 session.append(Block::Tool {
                     seq: session.next_seq(),
                     output: result.output,
                     exit_code: result.exit_code,
-                    tool_call_id: tc_id.unwrap_or_default(),
+                    tool_call_id,
                 })?;
+                break;
             }
+
+            let result = shell.run_command(&cmd)?;
+            session.append(Block::Tool {
+                seq: session.next_seq(),
+                output: result.output,
+                exit_code: result.exit_code,
+                tool_call_id,
+            })?;
         }
         Ok(())
     }
 
+    /// 通过 `doit template system` 子进程生成系统提示(模式差异由 --interactive 控制)。
     async fn generate_system_prompt(
         &self,
         ctx: &RuntimeContext,
@@ -171,167 +167,42 @@ impl Agent {
         cmd.env("LANG", format!("{}.UTF-8", ctx.locale));
         let out = cmd
             .output()
-            .map_err(|e| crate::error::DoitError::shell("template failed"))?;
+            .map_err(|_| crate::error::DoitError::shell("template generation failed"))?;
         Ok(String::from_utf8_lossy(&out.stdout).to_string())
     }
 }
 
-// -- PTY execution --
-
-fn pty_exec(args: &[&str]) -> Result<CommandResult> {
-    pty_raw_mode(|| {
-        let mut cmd = portable_pty::CommandBuilder::new(args[0]);
-        for a in &args[1..] {
-            cmd.arg(a);
-        }
-        cmd.cwd(std::env::current_dir().unwrap_or_default());
-        pty_run(cmd)
-    })
+/// 把 LLM 的文本打印到真实终端(它在和用户说话)。终端处于 raw 模式(无 ONLCR),
+/// 需手动 \n → \r\n。内容上下各空一行与上下文隔开,并铺浅橘色着重底色。
+fn print_to_terminal(text: &str) {
+    use std::io::Write;
+    const BG: &str = "\x1b[48;2;55;41;25m"; // 浅橘色着重底色(略暗)
+    const EOL: &str = "\x1b[K"; // 用当前底色填充至行尾
+    const RESET: &str = "\x1b[0m";
+    let blank = format!("{BG}{EOL}{RESET}\r\n"); // 着色的空行
+    let mut out = blank.clone(); // 与上文隔一行(着色)
+    for line in text.replace("\r\n", "\n").split('\n') {
+        out.push_str(&format!("{BG}{line}{EOL}{RESET}\r\n"));
+    }
+    out.push_str(&blank); // 与下文隔一行(着色)
+    print!("{out}");
+    std::io::stdout().flush().ok();
 }
 
-fn pty_exec_direct(prog: &str, args: &[&str]) -> Result<CommandResult> {
-    pty_raw_mode(|| {
-        let mut cmd = portable_pty::CommandBuilder::new(prog);
-        for a in args {
-            cmd.arg(a);
-        }
-        cmd.cwd(std::env::current_dir().unwrap_or_default());
-        pty_run(cmd)
-    })
-}
-
-fn pty_exec_shell(cmd_str: &str) -> Result<CommandResult> {
-    pty_raw_mode(|| {
-        let mut cmd = portable_pty::CommandBuilder::new("sh");
-        cmd.arg("-c");
-        cmd.arg(cmd_str);
-        cmd.cwd(std::env::current_dir().unwrap_or_default());
-        pty_run(cmd)
-    })
-}
-
-fn pty_raw_mode<F: FnOnce() -> Result<CommandResult>>(f: F) -> Result<CommandResult> {
-    let stdin_fd = io::stdin().as_raw_fd();
-    let mut orig = std::mem::MaybeUninit::uninit();
-    let ok = unsafe { libc::tcgetattr(stdin_fd, orig.as_mut_ptr()) == 0 };
-    if ok {
-        let mut raw = unsafe { orig.assume_init() };
-        raw.c_lflag &= !(libc::ECHO | libc::ICANON);
-        raw.c_cc[libc::VMIN] = 1;
-        raw.c_cc[libc::VTIME] = 0;
-        unsafe {
-            libc::tcsetattr(stdin_fd, libc::TCSANOW, &raw);
-        }
+/// 渲染将要执行的命令行:着重底色 + 左侧宝石蓝粗竖条 + `$ <命令>`。
+/// 真实终端处于 raw 模式,使用 \r\n 换行;多行命令逐行加竖条。
+fn print_command(cmd: &str) {
+    use std::io::Write;
+    const BAR: &str = "\x1b[38;2;29;112;233m"; // 宝石蓝竖条
+    const BG: &str = "\x1b[48;2;38;43;59m"; // 着重底色
+    const FG: &str = "\x1b[39m"; // 恢复默认前景(保留底色)
+    const EOL: &str = "\x1b[K"; // 用当前底色填充至行尾
+    const RESET: &str = "\x1b[0m";
+    let mut out = String::new();
+    for (i, line) in cmd.lines().enumerate() {
+        let prefix = if i == 0 { "$ " } else { "  " };
+        out.push_str(&format!("{BG}{BAR}▌{FG}{prefix}{line}{EOL}{RESET}\r\n"));
     }
-    let r = f();
-    if ok {
-        let o = unsafe { orig.assume_init() };
-        unsafe {
-            libc::tcsetattr(stdin_fd, libc::TCSANOW, &o);
-        }
-    }
-    r
-}
-
-fn pty_run(cmd: portable_pty::CommandBuilder) -> Result<CommandResult> {
-    let sys = portable_pty::native_pty_system();
-    let pair = sys
-        .openpty(portable_pty::PtySize::default())
-        .map_err(|e| crate::error::DoitError::shell("pty"))?;
-
-    let mut child = pair
-        .slave
-        .spawn_command(cmd)
-        .map_err(|e| crate::error::DoitError::shell("spawn"))?;
-    drop(pair.slave);
-
-    let mut reader = pair
-        .master
-        .try_clone_reader()
-        .map_err(|e| crate::error::DoitError::shell("reader"))?;
-    let mut writer = pair
-        .master
-        .take_writer()
-        .map_err(|e| crate::error::DoitError::shell("writer"))?;
-
-    let capture = Arc::new(Mutex::new(Vec::new()));
-    let cap2 = capture.clone();
-    let mut out = io::stdout();
-
-    let mut sig = [0i32; 2];
-    unsafe {
-        libc::pipe(sig.as_mut_ptr());
-    }
-    let (sr, sw) = (sig[0], sig[1]);
-
-    let h = thread::spawn(move || {
-        let mut buf = [0u8; 4096];
-        loop {
-            match reader.read(&mut buf) {
-                Ok(0) => {
-                    unsafe {
-                        libc::write(sw, [1].as_ptr() as *const _, 1);
-                    }
-                    break;
-                }
-                Ok(n) => {
-                    out.write_all(&buf[..n]).ok();
-                    out.flush().ok();
-                    cap2.lock().unwrap().extend_from_slice(&buf[..n]);
-                }
-                Err(_) => break,
-            }
-        }
-    });
-
-    let stdin_fd = io::stdin().as_raw_fd();
-    let mut buf = [0u8; 4096];
-    loop {
-        let mut fds = [
-            libc::pollfd {
-                fd: sr,
-                events: libc::POLLIN,
-                revents: 0,
-            },
-            libc::pollfd {
-                fd: stdin_fd,
-                events: libc::POLLIN,
-                revents: 0,
-            },
-        ];
-        unsafe {
-            libc::poll(fds.as_mut_ptr(), 2, -1);
-        }
-        if fds[0].revents & libc::POLLIN != 0 {
-            break;
-        }
-        if fds[1].revents & libc::POLLIN != 0 {
-            match io::stdin().read(&mut buf) {
-                Ok(0) => break,
-                Ok(n) => {
-                    writer.write_all(&buf[..n]).ok();
-                    writer.flush().ok();
-                }
-                Err(e) if e.kind() == io::ErrorKind::Interrupted => break,
-                Err(e) => {
-                    tracing::error!("stdin: {e}");
-                    break;
-                }
-            }
-        }
-    }
-
-    drop(writer);
-    unsafe {
-        libc::close(sw);
-        libc::close(sr);
-    }
-    h.join().ok();
-
-    let code = child.wait().map(|s| s.exit_code() as i32).unwrap_or(-1);
-    let out = String::from_utf8_lossy(&capture.lock().unwrap()).to_string();
-    Ok(CommandResult {
-        output: out,
-        exit_code: code,
-    })
+    print!("{out}");
+    std::io::stdout().flush().ok();
 }

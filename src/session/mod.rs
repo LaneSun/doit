@@ -6,6 +6,24 @@ use crate::error::Result;
 
 const SESSION_ROOT: &str = ".doit/sessions";
 
+/// 外层 doit 注入的环境变量,指向当前会话目录;子命令据此定位 logs/ 等。
+pub const SESSION_DIR_ENV: &str = "DOIT_SESSION_DIR";
+
+/// 解析当前会话目录:优先读 `DOIT_SESSION_DIR`(在 doit 会话内),
+/// 否则降级到临时目录,保证子命令(如 `doit exec`)可脱离 doit 环境独立使用。
+pub fn resolve_session_dir() -> PathBuf {
+    std::env::var(SESSION_DIR_ENV)
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| std::env::temp_dir().join("doit"))
+}
+
+/// 当前会话的日志目录(若不存在则创建)。截断溢出的完整输出写入此处。
+pub fn logs_dir() -> PathBuf {
+    let dir = resolve_session_dir().join("logs");
+    let _ = fs::create_dir_all(&dir);
+    dir
+}
+
 pub struct Session {
     pub id: String,
     pub dir: PathBuf,

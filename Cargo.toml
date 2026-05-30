@@ -10,11 +10,11 @@ dotenvy = "0.15.7"
 glob = "0.3.3"
 libc = "0.2.186"
 miette = { version = "7.6.0", features = ["fancy"] }
+nix = { version = "0.31.3", features = ["term", "signal", "event", "fs"] }
 portable-pty = "0.9.0"
 regex = "1.12.3"
 reqwest = { version = "0.13.3", features = ["json"] }
 rust-i18n = "4.0.0"
-rustyline = "18.0.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 thiserror = "2.0.18"

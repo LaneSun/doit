@@ -13,8 +13,7 @@ Output:
   (none)
 
 Scenario:
-  The LLM calls exit when the task is complete and there is nothing more to do.
-  The summary is passed to the parent agent loop for reporting to the user.
-
-Only available in non-interactive mode (doit run / doit task).
+  The LLM calls exit to end the session: when the task is complete (run/task
+  mode) or when the interactive conversation is finished. The summary, if any,
+  is shown to the user.
 """

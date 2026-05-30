@@ -1,23 +1,17 @@
 [prompt]
 not_available = "doit prompt is only available in interactive mode"
 skill = """
-Block waiting for user input.
+Ask the user a question and block until they reply.
 
 Usage:
   doit prompt '<message>'
-  doit prompt <<'EOF'
-multiline line 1
-multiline line 2
-EOF
 
-Output:
-  > {user input}
-  > <ENTER>
+The message is printed to the user, then a '> ' prompt waits for one line of
+input. The reply is returned as the command result.
 
 Scenario:
-  The LLM calls prompt to ask the user a question or request confirmation
-  before proceeding. The command blocks until the user responds, then returns
-  the response as output.
-
-Only available in interactive mode.
+  In interactive mode you normally just reply with plain text (no tool call) to
+  talk to the user; that is automatically turned into a prompt. Call doit prompt
+  explicitly when you want to ask a question in the middle of a command sequence.
+  Only meaningful in interactive mode.
 """

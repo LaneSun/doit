@@ -37,16 +37,16 @@ fn to_api_message(block: &Block) -> ChatMessage {
                     r#type: "function".to_string(),
                     function: FunctionCall {
                         name: "sh".to_string(),
-                        arguments: format!(r#"{{"command":"{}"}}"#, cmd),
+                        // 用 serde_json 安全序列化,避免 cmd 含引号/换行破坏 JSON
+                        arguments: serde_json::json!({ "command": cmd }).to_string(),
                     },
                 }]
             });
 
-            let api_content = content.as_ref().map(|_| "".to_string());
-
             ChatMessage {
                 role: Role::Assistant,
-                content: api_content,
+                // 保留 LLM 原始 content(无工具调用时即为发给用户的消息),不可丢失
+                content: content.clone(),
                 reasoning_content: Some(reasoning.clone()),
                 tool_calls,
                 tool_call_id: None,
