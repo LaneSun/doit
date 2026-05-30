@@ -156,12 +156,9 @@ impl ShellSession {
 
         // --noediting:关闭 readline 行编辑。这样命令回显由终端行规程负责,
         // 我们得以永久关闭回显、自行打印格式化的命令行,且不会打乱 readline 状态。
-        let args = [
-            "--noediting".to_string(),
-            "--norc".to_string(),
-            "--noprofile".to_string(),
-            "-i".to_string(),
-        ];
+        // 不加 --norc/--noprofile:交互式 bash 正常加载用户 ~/.bashrc(别名、函数、PATH 等),
+        // 让内部 shell 与用户平时的终端一致。我们的 PS1 哨兵在 rc 加载后注入,会覆盖 rc 中的设置。
+        let args = ["--noediting".to_string(), "-i".to_string()];
         let (master, master_fd, child) = pty::spawn_on_pty(
             "bash",
             &args,
@@ -241,10 +238,15 @@ impl ShellSession {
         }
     }
 
-    /// 运行裸 `doit prompt` 读取用户输入(content 转换路径用)。命令照常回显,
-    /// 符合「可见即所执行」的 shell 语义;用户最终输入经 reply 文件确定性取回。
-    pub fn prompt_input(&mut self) -> Result<String> {
-        self.run_and_capture_reply("doit prompt")
+    /// 运行 `doit prompt` 读取用户输入。`shell_mode` 为真时显示 ` $ ` 命令提示符,
+    /// 否则显示 ` > ` 对话提示符。用户最终输入经 reply 文件确定性取回。
+    pub fn prompt_input(&mut self, shell_mode: bool) -> Result<String> {
+        let cmd = if shell_mode {
+            "doit prompt --shell"
+        } else {
+            "doit prompt"
+        };
+        self.run_and_capture_reply(cmd)
     }
 
     /// 运行 LLM 手工发起的 doit prompt 工具调用,同样经 reply 文件取回输入。

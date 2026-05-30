@@ -40,3 +40,13 @@ pub struct ChatResponse {
     pub content: Option<String>,
     pub is_prompt: bool,
 }
+
+/// 流式增量事件:后端边收边回调,前端据此实时渲染。
+pub enum StreamEvent<'a> {
+    /// 思维链增量(灰色显示)
+    Reasoning(&'a str),
+    /// 对话内容增量(橘色块显示)
+    Content(&'a str),
+    /// 命令增量(从工具调用参数中实时解码出的 command 字段增量)
+    Command(&'a str),
+}

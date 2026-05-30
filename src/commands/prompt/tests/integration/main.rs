@@ -35,9 +35,17 @@ fn prompt_reads_tty_and_writes_reply() {
     cmd.args(["prompt", "What is your name?"])
         .env("RUST_LOG", "off")
         .env("LANG", "en_US.UTF-8")
+        .env("TERM", "xterm-256color")
         .env("DOIT_SESSION_DIR", &session_dir);
     unsafe {
         cmd.pre_exec(move || {
+            // 新会话 + 令 pts 成为控制终端(reedline 经 /dev/tty 读输入),与真实运行一致
+            if libc::setsid() == -1 {
+                return Err(std::io::Error::last_os_error());
+            }
+            if libc::ioctl(slave_fd, libc::TIOCSCTTY as libc::c_ulong, 0) == -1 {
+                return Err(std::io::Error::last_os_error());
+            }
             for target in 0..=2 {
                 if libc::dup2(slave_fd, target) == -1 {
                     return Err(std::io::Error::last_os_error());
@@ -50,19 +58,40 @@ fn prompt_reads_tty_and_writes_reply() {
     drop(pty.slave);
 
     let mut master: std::fs::File = std::fs::File::from(pty.master);
+    // master 设非阻塞,便于在 read 之间穿插写入(充当极简终端)
+    unsafe {
+        let mfd = master.as_raw_fd();
+        let flags = libc::fcntl(mfd, libc::F_GETFL);
+        libc::fcntl(mfd, libc::F_SETFL, flags | libc::O_NONBLOCK);
+    }
 
-    // 模拟用户键入回答
-    std::thread::sleep(Duration::from_millis(300));
-    master.write_all(b"Alice\n").unwrap();
-    master.flush().unwrap();
-
-    // 读取 PTY 输出(子进程退出后 master 收到 EIO,视为结束)
+    // 充当极简终端:回应 reedline 的光标位置查询(\x1b[6n),并在提示符出现后键入回答。
+    // 真实终端会自动回应 DSR;测试环境需自行模拟,否则 reedline 会阻塞等待。
     let mut output = Vec::new();
     let mut buf = [0u8; 1024];
-    loop {
+    let mut input_sent = false;
+    let start = std::time::Instant::now();
+    while start.elapsed() < Duration::from_secs(5) {
         match master.read(&mut buf) {
             Ok(0) => break,
-            Ok(n) => output.extend_from_slice(&buf[..n]),
+            Ok(n) => {
+                let chunk = &buf[..n];
+                output.extend_from_slice(chunk);
+                if chunk.windows(4).any(|w| w == b"\x1b[6n") {
+                    let _ = master.write_all(b"\x1b[1;1R"); // 回应光标位置
+                    let _ = master.flush();
+                }
+            }
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                if !input_sent && output.windows(4).any(|w| w == b"\x1b[6n") {
+                    std::thread::sleep(Duration::from_millis(50));
+                    master.write_all(b"Alice\r").unwrap(); // 真实终端 Enter 发 \r
+                    master.flush().unwrap();
+                    input_sent = true;
+                } else {
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+            }
             Err(_) => break,
         }
     }
