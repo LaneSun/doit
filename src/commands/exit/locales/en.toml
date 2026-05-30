@@ -13,7 +13,6 @@ Output:
   (none)
 
 Scenario:
-  The LLM calls exit to end the session: when the task is complete (run/task
-  mode) or when the interactive conversation is finished. The summary, if any,
-  is shown to the user.
+  Call exit to end the session — when the task is complete or the conversation
+  is finished. The summary, if any, is shown to the user.
 """

@@ -6,12 +6,11 @@ Ask the user a question and block until they reply.
 Usage:
   doit prompt '<message>'
 
-The message is printed to the user, then a '> ' prompt waits for one line of
+The message is shown to the user, then an input prompt waits for one line of
 input. The reply is returned as the command result.
 
 Scenario:
-  In interactive mode you normally just reply with plain text (no tool call) to
-  talk to the user; that is automatically turned into a prompt. Call doit prompt
-  explicitly when you want to ask a question in the middle of a command sequence.
-  Only meaningful in interactive mode.
+  Normally you just reply with plain text (no tool call) to talk to the user.
+  Call doit prompt explicitly only when you must ask a question in the middle of
+  a command sequence without ending your turn. Interactive mode only.
 """
