@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 async-trait = "0.1.89"
+axum = { version = "0.8.9", features = ["ws"] }
 clap = { version = "4.6.1", features = ["derive"] }
 directories = "6.0.0"
 dotenvy = "0.15.7"
@@ -13,18 +14,22 @@ futures-util = "0.3.31"
 glob = "0.3.3"
 libc = "0.2.186"
 miette = { version = "7.6.0", features = ["fancy"] }
+mime_guess = "2.0.5"
 nix = { version = "0.31.3", features = ["term", "signal", "event", "fs"] }
 portable-pty = "0.9.0"
 reedline = "0.43.0"
 regex = "1.12.3"
 reqwest = { version = "0.13.3", features = ["json", "stream"] }
+rust-embed = { version = "8.11.0", features = ["mime-guess"] }
 rust-i18n = "4.0.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.149", features = ["preserve_order"] }
+shell-words = "1.1.1"
 thiserror = "2.0.18"
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros"] }
 toml = "1.1.2"
 toml_edit = "0.25.12"
+tower-http = { version = "0.6.11", features = ["fs", "cors"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 uuid = { version = "1.23.1", features = ["v4"] }

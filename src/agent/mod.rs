@@ -117,7 +117,7 @@ impl Agent {
     /// 一个 LLM 回合:流式拿到响应并据类型处理。
     /// - 自由文本 → 记录 Assistant 内容,返回 AwaitUser(等待用户输入);
     /// - 工具调用 → 执行命令,结果配对为 Tool block;`doit exit` 返回 Exit,其余返回 Continue。
-    async fn llm_turn(
+    pub(crate) async fn llm_turn(
         &self,
         session: &mut Session,
         shell: &mut ShellSession,
@@ -159,9 +159,12 @@ impl Agent {
 
         let trimmed = cmd.trim_start();
 
-        // LLM 手工调用 doit prompt:由 doit prompt 自己渲染输入框并取回输入
+        // LLM 手工调用 doit prompt:视图可接管(web),否则由 doit prompt 子命令在 shell 中取输入(终端)
         if trimmed.starts_with("doit prompt") {
-            let reply = shell.run_prompt_command(&cmd)?;
+            let reply = match view.handle_prompt(&cmd) {
+                Some(r) => r?,
+                None => shell.run_prompt_command(&cmd)?,
+            };
             session.append(Block::Tool {
                 seq: session.next_seq(),
                 output: reply,
@@ -188,7 +191,7 @@ impl Agent {
     }
 
     /// 通过 `doit template system` 子进程生成系统提示(模式差异由 --interactive 控制)。
-    async fn generate_system_prompt(
+    pub(crate) async fn generate_system_prompt(
         &self,
         ctx: &RuntimeContext,
         interactive: bool,
@@ -242,7 +245,7 @@ pub enum Verbosity {
 }
 
 /// 一个 LLM 回合的结果。
-enum TurnOutcome {
+pub(crate) enum TurnOutcome {
     /// LLM 还在行动(执行了命令),继续下一回合
     Continue,
     /// LLM 停止行动,等待用户输入
@@ -516,13 +519,19 @@ impl StreamRender {
 
 /// 一个 LLM 回合的「输出视图」:把流式增量与命令结果导向不同呈现方式
 /// —— 交互式 raw 终端渲染,或子 Agent(doit task)按 verbosity 的纯文本输出。
-trait TurnView {
+pub(crate) trait TurnView {
     /// LLM 流式增量(reasoning / narration / command)。
     fn on_stream(&mut self, ev: crate::backend::StreamEvent);
     /// 流式结束(收尾)。
     fn on_stream_end(&mut self);
     /// 一条命令执行完成。`is_exit` 表示该命令是 doit exit(其输出即最终总结)。
     fn on_command(&mut self, cmd: &str, out: &CommandOutput, is_exit: bool);
+    /// LLM 发起 doit prompt 时由视图接管获取用户回复。
+    /// 返回 `Some(reply)` 表示视图已处理(如 web:推送提示并等待 WS 回复);
+    /// 返回 `None` 表示回退到在常驻 shell 中运行 doit prompt 子命令(终端默认)。
+    fn handle_prompt(&mut self, _cmd: &str) -> Option<Result<String>> {
+        None
+    }
 }
 
 /// 交互式视图:复用流式 raw 渲染。命令输出已由常驻 shell 实时转发到终端,此处不再打印。

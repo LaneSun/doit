@@ -11,3 +11,4 @@ pub mod error;
 pub mod i18n;
 pub mod pty;
 pub mod session;
+pub mod web;

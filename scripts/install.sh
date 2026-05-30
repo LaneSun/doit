@@ -54,10 +54,24 @@ BINPATH="${BINDIR}/doit"
 command -v cargo &>/dev/null || die "cargo not found. Install Rust from https://rustup.rs"
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_DIR"
+
+# ---- Build frontend (web UI) ----
+# rust-embed 在 release 构建时把 web/build 嵌入二进制,故需先产出前端资源。
+if command -v bun &>/dev/null; then
+    info "Building web frontend (bun)..."
+    (cd web && bun install --frozen-lockfile 2>/dev/null || bun install)
+    (cd web && bun run build)
+elif [[ ! -d web/build || -z "$(ls -A web/build 2>/dev/null)" ]]; then
+    warn "bun not found and web/build is empty; the web UI will not be available."
+    mkdir -p web/build
+    echo '<!doctype html><meta charset="utf-8"><title>doit</title><p>Frontend not built.' > web/build/index.html
+else
+    warn "bun not found; reusing existing web/build."
+fi
 
 # ---- Build ----
 info "Building doit (release mode)..."
-cd "$PROJECT_DIR"
 cargo build --release
 
 # ---- Install ----

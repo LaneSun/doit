@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 
 use crate::commands::{
     config, edit, exec, exit, glob, interactive, prompt, read, resume, run, search, task, template,
-    write,
+    web, write,
 };
 
 #[derive(Parser)]
@@ -52,4 +52,6 @@ pub enum Command {
     Resume(resume::Args),
     /// View or edit configuration
     Config(config::Args),
+    /// Serve a browser UI for interactive mode
+    Web(web::Args),
 }

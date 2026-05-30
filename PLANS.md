@@ -52,20 +52,27 @@
 - 元信息面板：上下文用量、模型、推理强度等
 - 配置界面：修改项目级与用户级配置（复用任务 1 的配置系统）
 
-### 关键架构问题（待讨论）
+### 已定方向
 
-- Web 与终端交互模式的关系：Web 作为同一 Agent 循环的「另一个视图 + 输入源」（复用现有 `TurnView` 抽象），还是独立 headless 服务
-- 传输：HTTP + WebSocket（事件广播 + 用户输入回传）
-- 运行中命令的 PTY 如何桥接到浏览器（xterm.js ↔ PTY master），实现交互式输入——本任务最难、最新颖的部分
-- 前端静态资源分发：`rust-embed` 嵌入二进制 vs 磁盘读取
-- Rust 侧 HTTP 框架：`axum`（tokio 生态主流）
+- 启动形态：`doit web [--host --port]` 独立子命令
+- 第一版范围：只读对话/命令展示 + 流式输出 + 用户输入 + 配置界面；运行中命令的 PTY↔xterm 交互后置为独立阶段
+- 前端：`web/` 子目录，SvelteKit + Tailwind，用 **bun** 构建，产物 `rust-embed` 嵌入二进制
+- 传输：HTTP REST（配置/元信息/历史快照）+ WebSocket（下行事件流、上行用户输入）
+- Rust 侧：`axum` + `rust-embed`
 
-### 拟分阶段
+### 架构要点
 
-1. 事件总线：把 Agent 的流式事件（reasoning/content/narration/命令/输出）抽象为可广播事件
-2. axum 服务骨架 + WebSocket + 静态资源分发 + URL 输出
-3. SvelteKit + Tailwind 前端：对话/命令折叠列表、元信息面板
-4. 运行中命令 PTY ↔ xterm.js 交互式桥接
-5. 配置编辑界面（依赖任务 1）
+- Agent 循环跑在专用 std::thread（内置 current-thread tokio runtime 驱动 async 后端）；axum 在主 runtime
+- Agent → Web：`tokio::broadcast<WebEvent>` + 共享事件历史缓冲（供新连接回放）
+- Web → Agent：`std::mpsc<String>`（专用线程阻塞 recv）
+- 复用 `llm_turn`；`TurnView` 增加默认方法 `handle_prompt`（web 接管 doit prompt，终端回退到子进程）
+- 新增 `WebView`（实现 `TurnView`）把流式增量与命令结果转 JSON 事件；非交互 `ShellSession`（仅捕获输出）
 
-### 状态：方向待讨论（任务 1 完成后展开）
+### 分阶段
+
+1. 事件模型 `WebEvent` + `WebView`（TurnView）+ `handle_prompt` 钩子 — 已完成
+2. `web` 子命令 + axum 骨架（HTTP+WS+静态资源+URL 输出+`--host/--port`）+ Agent 线程桥接 — 已完成
+3. SvelteKit + Tailwind 前端：对话/命令折叠列表、流式渲染、元信息、配置界面 — 已完成
+4. （后置）运行中命令 PTY ↔ xterm.js 交互桥接 — 待做
+
+### 状态：第一版已完成（待用户审计）；运行中命令的 xterm 交互留待后置阶段

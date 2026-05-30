@@ -64,5 +64,6 @@ async fn main() -> Result<()> {
         Some(Command::Resume(args)) => commands::resume::execute(&ctx, &args).await,
         Some(Command::Template(args)) => commands::template::execute(&ctx, &args).await,
         Some(Command::Config(args)) => commands::config::execute(&ctx, &args).await,
+        Some(Command::Web(args)) => commands::web::execute(&ctx, &args).await,
     }
 }

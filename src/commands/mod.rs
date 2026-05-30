@@ -11,4 +11,5 @@ pub mod run;
 pub mod search;
 pub mod task;
 pub mod template;
+pub mod web;
 pub mod write;

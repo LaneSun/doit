@@ -1,0 +1,16 @@
+[web]
+skill = """
+Serve a browser UI for interactive mode.
+
+Usage:
+  doit web                       # serve on 127.0.0.1 with a random port
+  doit web --port 8080           # fixed port
+  doit web --host 0.0.0.0        # expose on the local network
+
+Output:
+  A URL like http://127.0.0.1:PORT (open it in a browser).
+
+Scenario:
+  Drive the same interactive agent from a web page: collapsible conversation
+  and command entries, streaming output, meta info, and a config editor.
+"""
