@@ -143,12 +143,15 @@ pub struct ShellSession {
     sentinel: SentinelMatcher,
     sigwinch_read: RawFd,
     session_dir: PathBuf,
+    /// 交互模式:接管真实终端 raw、实时转发命令输出、转发 stdin。
+    /// 非交互(子 Agent):都不做,命令输出仅捕获,由调用方按档位决定如何呈现。
+    interactive: bool,
     _raw_guard: Option<RawModeGuard>,
 }
 
 impl ShellSession {
     /// 启动常驻 bash 会话。`session_dir` 通过 `DOIT_SESSION_DIR` 暴露给子命令。
-    pub fn spawn(session_dir: &Path) -> Result<Self> {
+    pub fn spawn(session_dir: &Path, interactive: bool) -> Result<Self> {
         let stdin_fd = std::io::stdin().as_raw_fd();
         let ws = pty::get_winsize(stdin_fd);
         let term = std::env::var("TERM").unwrap_or_else(|_| "xterm-256color".to_string());
@@ -167,7 +170,12 @@ impl ShellSession {
         )?;
 
         let sigwinch_read = pty::install_sigwinch_pipe()?;
-        let raw_guard = RawModeGuard::new(stdin_fd)?;
+        // 非交互(子 Agent)不接管真实终端:不进入 raw 模式
+        let raw_guard = if interactive {
+            RawModeGuard::new(stdin_fd)?
+        } else {
+            None
+        };
 
         let nonce = uuid::Uuid::new_v4().simple().to_string();
         let sentinel = SentinelMatcher::new(&nonce);
@@ -180,6 +188,7 @@ impl ShellSession {
             sentinel,
             sigwinch_read,
             session_dir: session_dir.to_path_buf(),
+            interactive,
             _raw_guard: raw_guard,
         };
         session.init_shell(&nonce)?;
@@ -220,7 +229,7 @@ impl ShellSession {
         self.master.write_all(b"\n").ok();
         self.master.flush().ok();
 
-        let (filtered, code) = self.pump(true)?;
+        let (filtered, code) = self.pump(self.interactive)?;
         let text = String::from_utf8_lossy(&filtered).to_string();
 
         if text.contains("\x1b[?1049h") {
@@ -268,7 +277,7 @@ impl ShellSession {
     fn pump(&mut self, forward: bool) -> Result<(Vec<u8>, i32)> {
         let mut collected = Vec::new();
         let mut buf = [0u8; 8192];
-        let mut stdin_open = true;
+        let mut stdin_open = self.interactive; // 非交互模式不消费父进程 stdin
 
         loop {
             // 在独立作用域内构建 PollFd,避免对 self.master 的借用与后续可变借用冲突
@@ -391,7 +400,7 @@ mod tests {
     #[test]
     fn resident_shell_contract() {
         let dir = tmp_session();
-        let mut sh = ShellSession::spawn(&dir).expect("spawn shell");
+        let mut sh = ShellSession::spawn(&dir, true).expect("spawn shell");
 
         let out = sh.run_command("echo hello123").unwrap();
         assert!(out.output.contains("hello123"), "echo 输出: {:?}", out.output);

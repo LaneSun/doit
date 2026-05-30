@@ -7,7 +7,10 @@ use crate::block::Block;
 use crate::context::RuntimeContext;
 use crate::error::Result;
 use crate::session::Session;
-use shell::ShellSession;
+use shell::{CommandOutput, ShellSession};
+
+/// 默认 LLM 模型。
+pub const DEFAULT_MODEL: &str = "deepseek-v4-pro";
 
 pub struct Agent {
     backend: DeepSeekBackend,
@@ -18,6 +21,17 @@ impl Agent {
         Self { backend }
     }
 
+    /// 从环境(DEEPSEEK_API_KEY)构造使用默认后端的 Agent。
+    pub fn from_env() -> Self {
+        let api_key = std::env::var("DEEPSEEK_API_KEY").unwrap_or_default();
+        let backend = DeepSeekBackend::new(
+            "https://api.deepseek.com".to_string(),
+            api_key,
+            DEFAULT_MODEL.to_string(),
+        );
+        Self::new(backend)
+    }
+
     /// 交互模式:先 prompt 取回用户的首个请求,再进入循环让 LLM 工作。
     pub async fn run_interactive(&self, ctx: &RuntimeContext, session: &mut Session) -> Result<()> {
         let system = self.generate_system_prompt(ctx, true).await?;
@@ -25,7 +39,7 @@ impl Agent {
             seq: session.next_seq(),
             content: system,
         })?;
-        let mut shell = ShellSession::spawn(&session.dir)?;
+        let mut shell = ShellSession::spawn(&session.dir, true)?;
         self.run_interactive_loop(session, &mut shell).await
     }
 
@@ -35,6 +49,7 @@ impl Agent {
         ctx: &RuntimeContext,
         session: &mut Session,
         task: &str,
+        verbosity: Verbosity,
     ) -> Result<()> {
         let base = self.generate_system_prompt(ctx, false).await?;
         let content = format!("{base}\n\nTask: {task}\n\nExecute the assigned task.");
@@ -42,10 +57,11 @@ impl Agent {
             seq: session.next_seq(),
             content,
         })?;
-        let mut shell = ShellSession::spawn(&session.dir)?;
+        let mut shell = ShellSession::spawn(&session.dir, false)?;
         // 任务模式无用户回合:LLM 持续行动直到 doit exit 或停止行动
         loop {
-            match self.llm_turn(session, &mut shell).await? {
+            let mut view = TaskView::new(verbosity);
+            match self.llm_turn(session, &mut shell, &mut view).await? {
                 TurnOutcome::Continue => continue,
                 TurnOutcome::AwaitUser | TurnOutcome::Exit => break,
             }
@@ -94,7 +110,8 @@ impl Agent {
 
             // —— LLM 回合:持续行动直到需要用户输入或退出 ——
             loop {
-                match self.llm_turn(session, shell).await? {
+                let mut view = InteractiveView::new();
+                match self.llm_turn(session, shell, &mut view).await? {
                     TurnOutcome::Continue => continue,
                     TurnOutcome::AwaitUser => break,
                     TurnOutcome::Exit => return Ok(()),
@@ -111,15 +128,15 @@ impl Agent {
         &self,
         session: &mut Session,
         shell: &mut ShellSession,
+        view: &mut dyn TurnView,
     ) -> Result<TurnOutcome> {
         let messages = session.build_messages();
-        // 流式渲染:思维(灰)、内容(橘块)、命令($ 竖条)边收边显示
-        let mut ui = StreamRender::new();
+        // 流式事件交给视图:交互式 raw 渲染 / 子 Agent 按档输出
         let response = self
             .backend
-            .chat_stream(&messages, |ev| ui.event(ev))
+            .chat_stream(&messages, |ev| view.on_stream(ev))
             .await?;
-        ui.finish();
+        view.on_stream_end();
         let reasoning = response.reasoning.clone().unwrap_or_default();
 
         if response.is_prompt {
@@ -163,6 +180,7 @@ impl Agent {
 
         let is_exit = trimmed.starts_with("doit exit");
         let result = shell.run_command(&cmd)?;
+        view.on_command(&cmd, &result, is_exit);
         session.append(Block::Tool {
             seq: session.next_seq(),
             output: result.output,
@@ -194,6 +212,17 @@ impl Agent {
             .map_err(|_| crate::error::DoitError::shell("template generation failed"))?;
         Ok(String::from_utf8_lossy(&out.stdout).to_string())
     }
+}
+
+/// 子 Agent(doit task)的输出详细档位。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+pub enum Verbosity {
+    /// 仅最终 exit 总结
+    Result,
+    /// 每条命令的 narration 行 + 最终总结
+    Summary,
+    /// 完整 transcript(narration + 命令 + 输出) + 最终总结
+    Full,
 }
 
 /// 一个 LLM 回合的结果。
@@ -456,5 +485,106 @@ impl StreamRender {
         self.narration.clear(); // 丢弃无对应命令的残留概述
         self.cmd = CommandFilter::Inactive;
         self.finish_block();
+    }
+}
+
+/// 一个 LLM 回合的「输出视图」:把流式增量与命令结果导向不同呈现方式
+/// —— 交互式 raw 终端渲染,或子 Agent(doit task)按 verbosity 的纯文本输出。
+trait TurnView {
+    /// LLM 流式增量(reasoning / narration / command)。
+    fn on_stream(&mut self, ev: crate::backend::StreamEvent);
+    /// 流式结束(收尾)。
+    fn on_stream_end(&mut self);
+    /// 一条命令执行完成。`is_exit` 表示该命令是 doit exit(其输出即最终总结)。
+    fn on_command(&mut self, cmd: &str, out: &CommandOutput, is_exit: bool);
+}
+
+/// 交互式视图:复用流式 raw 渲染。命令输出已由常驻 shell 实时转发到终端,此处不再打印。
+struct InteractiveView {
+    render: StreamRender,
+}
+
+impl InteractiveView {
+    fn new() -> Self {
+        Self {
+            render: StreamRender::new(),
+        }
+    }
+}
+
+impl TurnView for InteractiveView {
+    fn on_stream(&mut self, ev: crate::backend::StreamEvent) {
+        self.render.event(ev);
+    }
+    fn on_stream_end(&mut self) {
+        self.render.finish();
+    }
+    fn on_command(&mut self, _cmd: &str, _out: &CommandOutput, _is_exit: bool) {}
+}
+
+/// 子 Agent 视图:按 verbosity 向 stdout 输出纯文本(无 ANSI,因输出会进入父 Agent 上下文)。
+/// - Result:仅最终 exit 总结
+/// - Summary:每回合 narration 行 + 最终总结
+/// - Full:完整 narration + 命令 + 输出 + 最终总结
+struct TaskView {
+    verbosity: Verbosity,
+    narration: String,
+    content: String,
+}
+
+impl TaskView {
+    fn new(verbosity: Verbosity) -> Self {
+        Self {
+            verbosity,
+            narration: String::new(),
+            content: String::new(),
+        }
+    }
+}
+
+impl TurnView for TaskView {
+    fn on_stream(&mut self, ev: crate::backend::StreamEvent) {
+        // narration(命令回合)与 content(自由文本收尾)进入输出;reasoning/command 增量忽略
+        match ev {
+            crate::backend::StreamEvent::Narration(s) => self.narration.push_str(s),
+            crate::backend::StreamEvent::Content(s) => self.content.push_str(s),
+            _ => {}
+        }
+    }
+
+    fn on_stream_end(&mut self) {
+        // 命令回合:summary/full 打印 narration 行
+        if !self.narration.is_empty()
+            && matches!(self.verbosity, Verbosity::Summary | Verbosity::Full)
+        {
+            println!("# {}", self.narration.trim());
+        }
+        // 文本回合:LLM 以自由文本收尾(未走 doit exit),该文本即最终输出,所有档都打印
+        if !self.content.is_empty() {
+            println!("{}", self.content.trim());
+        }
+        self.narration.clear();
+        self.content.clear();
+    }
+
+    fn on_command(&mut self, cmd: &str, out: &CommandOutput, is_exit: bool) {
+        match self.verbosity {
+            Verbosity::Full => {
+                println!("$ {cmd}");
+                let o = out.output.trim_end();
+                if !o.is_empty() {
+                    println!("{o}");
+                }
+            }
+            // result / summary:仅把最终 exit 的总结作为结果输出
+            Verbosity::Summary | Verbosity::Result => {
+                if is_exit {
+                    let s = out.output.trim();
+                    if !s.is_empty() {
+                        println!("{s}");
+                    }
+                }
+            }
+        }
     }
 }

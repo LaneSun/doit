@@ -31,7 +31,7 @@ pub enum Command {
     Search(search::Args),
     /// Execute a one-shot task (turn-by-turn display)
     Run(run::Args),
-    /// Execute a task as sub-agent (non-interactive, result only)
+    /// Run a task as a sub-agent (non-interactive); output controlled by --verbosity
     Task(task::Args),
     /// Generate prompt templates
     Template(template::Args),

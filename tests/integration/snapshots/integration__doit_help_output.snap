@@ -16,7 +16,7 @@ Commands:
   read         Read file contents with line numbers
   search       Search file contents with regex
   run          Execute a one-shot task (turn-by-turn display)
-  task         Execute a task as sub-agent (non-interactive, result only)
+  task         Run a task as a sub-agent (non-interactive); output controlled by --verbosity
   template     Generate prompt templates
   write        Write content to a file (reads from stdin)
   resume       Resume a previous session

@@ -204,3 +204,28 @@ Output:
 Scenario:
   Use exec when you want bounded output or to run an interactive/TUI program.
   Plain commands can be run directly without exec.
+
+---
+$ doit task --skill
+Run a task as an independent sub-agent (non-interactive). It works in isolation
+until it finishes, then returns its output to you.
+
+Usage:
+  doit task '<description>'
+  doit task -v full '<description>'
+  doit task <<'EOF'
+multiline task description
+EOF
+
+Verbosity (--verbosity / -v): controls what is printed
+  result   - only the final summary
+  summary  - one '# narration' line per command + final summary (default)
+  full     - complete transcript (commands + output) + final summary
+
+Output:
+  As selected above. Blocking by default; if you don't want to wait, background
+  it yourself (trailing & or redirect to a file).
+
+Scenario:
+  Delegate a self-contained subtask to keep your own context small. Use summary
+  for a high-level trace, result when you only need the outcome, full for detail.

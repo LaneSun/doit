@@ -33,7 +33,7 @@ cat << 'EOF'
 
 以下是在该环境下可用的额外特殊命令：
 EOF
-for cmd in prompt exit glob read search write edit exec; do
+for cmd in prompt exit glob read search write edit exec task; do
   echo "---"
   echo "\\$ doit $cmd --skill"
   "$DOIT_BIN" "$cmd" --skill
@@ -54,7 +54,7 @@ cat << 'EOF'
 - 运行交互式或全屏程序,用 doit exec --raw -- <程序>。
 
 ## 完成
-- 任务完成时,调用 doit exit 并附上简短总结。
+- 务必以调用 doit exit 并附简短结果总结来结束。不要用纯文本消息收尾 —— 非交互模式下,返回给调用方的正是 doit exit 的总结。
 
 ## 安全
 - 执行前评估危险性。没有用户可确认,除非任务明确需要,否则避免破坏性或不可逆操作。
