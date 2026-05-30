@@ -3,9 +3,10 @@ use std::io::IsTerminal;
 use clap::Parser;
 use doit::cli::{Cli, Command};
 use doit::commands;
+use doit::config::Config;
 use doit::context::RuntimeContext;
 use doit::error::Result;
-use doit::i18n::detect_locale;
+use doit::i18n::{detect_locale, normalize_locale};
 use rust_i18n::t;
 
 rust_i18n::i18n!("locales");
@@ -14,10 +15,25 @@ rust_i18n::i18n!("locales");
 async fn main() -> Result<()> {
     let _ = dotenvy::dotenv();
 
+    let cli = Cli::parse();
+
+    // 加载分级配置;CLI 参数为最高优先级,在此覆盖
+    let mut config = Config::load(cli.config.as_deref())?;
+    if let Some(model) = &cli.model {
+        config.model.name = model.clone();
+    }
+
+    // 语言:配置显式设定优先,否则环境探测
+    let locale = match &config.locale.lang {
+        Some(lang) => normalize_locale(lang),
+        None => detect_locale(),
+    };
+
     let ctx = RuntimeContext {
         stdin_is_tty: std::io::stdin().is_terminal(),
         stderr_is_tty: std::io::stderr().is_terminal(),
-        locale: detect_locale(),
+        locale,
+        config,
     };
     rust_i18n::set_locale(ctx.locale);
 
@@ -31,8 +47,6 @@ async fn main() -> Result<()> {
         .expect("failed to initialize tracing subscriber");
 
     tracing::debug!("{}", t!("tracing.startup"));
-
-    let cli = Cli::parse();
 
     match cli.command {
         None => commands::interactive::execute(&ctx, &commands::interactive::Args {}).await,
@@ -49,5 +63,6 @@ async fn main() -> Result<()> {
         Some(Command::Write(args)) => commands::write::execute(&ctx, &args).await,
         Some(Command::Resume(args)) => commands::resume::execute(&ctx, &args).await,
         Some(Command::Template(args)) => commands::template::execute(&ctx, &args).await,
+        Some(Command::Config(args)) => commands::config::execute(&ctx, &args).await,
     }
 }

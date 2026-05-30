@@ -1,5 +1,6 @@
 ---
 source: tests/integration/main.rs
+assertion_line: 10
 expression: stdout
 ---
 A shell-first AI agent

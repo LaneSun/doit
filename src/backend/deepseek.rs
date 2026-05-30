@@ -10,15 +10,22 @@ pub struct DeepSeekBackend {
     api_base: String,
     api_key: String,
     model: String,
+    temperature: f32,
+    max_tokens: u32,
+    thinking: bool,
 }
 
 impl DeepSeekBackend {
-    pub fn new(api_base: String, api_key: String, model: String) -> Self {
+    /// 从配置构造后端。
+    pub fn from_config(config: &crate::config::Config) -> Self {
         Self {
             client: Client::new(),
-            api_base,
-            api_key,
-            model,
+            api_base: config.api.base_url.clone(),
+            api_key: config.api.api_key.clone(),
+            model: config.model.name.clone(),
+            temperature: config.model.temperature,
+            max_tokens: config.model.max_tokens,
+            thinking: config.model.thinking,
         }
     }
 
@@ -30,13 +37,17 @@ impl DeepSeekBackend {
         mut on_event: impl FnMut(StreamEvent),
     ) -> Result<ChatResponse> {
         let api_messages: Vec<Value> = messages.iter().map(|m| self.build_api_message(m)).collect();
-        let body = json!({
+        let mut body = json!({
             "model": self.model,
-            "thinking": {"type": "enabled"},
             "messages": api_messages,
             "tools": [self.sh_tool_definition()],
             "stream": true,
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
         });
+        if self.thinking {
+            body["thinking"] = json!({"type": "enabled"});
+        }
 
         let response = self
             .client

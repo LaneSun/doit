@@ -1,12 +1,23 @@
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 
 use crate::commands::{
-    edit, exec, exit, glob, interactive, prompt, read, resume, run, search, task, template, write,
+    config, edit, exec, exit, glob, interactive, prompt, read, resume, run, search, task, template,
+    write,
 };
 
 #[derive(Parser)]
 #[command(name = "doit", about = "A shell-first AI agent", version)]
 pub struct Cli {
+    /// Path to an extra config file (highest-priority file layer)
+    #[arg(long, global = true, value_name = "PATH")]
+    pub config: Option<PathBuf>,
+
+    /// Override the model name (highest priority)
+    #[arg(long, global = true, value_name = "NAME")]
+    pub model: Option<String>,
+
     #[command(subcommand)]
     pub command: Option<Command>,
 }
@@ -39,4 +50,6 @@ pub enum Command {
     Write(write::Args),
     /// Resume a previous session
     Resume(resume::Args),
+    /// View or edit configuration
+    Config(config::Args),
 }

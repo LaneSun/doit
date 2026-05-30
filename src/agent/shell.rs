@@ -143,15 +143,19 @@ pub struct ShellSession {
     sentinel: SentinelMatcher,
     sigwinch_read: RawFd,
     session_dir: PathBuf,
-    /// 交互模式:接管真实终端 raw、实时转发命令输出、转发 stdin。
+    /// 交互模式:接管真实终端 raw、转发 stdin。
     /// 非交互(子 Agent):都不做,命令输出仅捕获,由调用方按档位决定如何呈现。
     interactive: bool,
+    /// 是否把命令输出实时转发到真实终端。交互模式下由 display.show_command_output 控制;
+    /// 非交互模式恒为 false(输出仅捕获)。
+    forward_output: bool,
     _raw_guard: Option<RawModeGuard>,
 }
 
 impl ShellSession {
     /// 启动常驻 bash 会话。`session_dir` 通过 `DOIT_SESSION_DIR` 暴露给子命令。
-    pub fn spawn(session_dir: &Path, interactive: bool) -> Result<Self> {
+    /// `forward_output` 控制是否把命令输出实时写回真实终端(交互模式专用)。
+    pub fn spawn(session_dir: &Path, interactive: bool, forward_output: bool) -> Result<Self> {
         let stdin_fd = std::io::stdin().as_raw_fd();
         let ws = pty::get_winsize(stdin_fd);
         let term = std::env::var("TERM").unwrap_or_else(|_| "xterm-256color".to_string());
@@ -189,6 +193,7 @@ impl ShellSession {
             sigwinch_read,
             session_dir: session_dir.to_path_buf(),
             interactive,
+            forward_output: interactive && forward_output,
             _raw_guard: raw_guard,
         };
         session.init_shell(&nonce)?;
@@ -229,7 +234,7 @@ impl ShellSession {
         self.master.write_all(b"\n").ok();
         self.master.flush().ok();
 
-        let (filtered, code) = self.pump(self.interactive)?;
+        let (filtered, code) = self.pump(self.forward_output)?;
         let text = String::from_utf8_lossy(&filtered).to_string();
 
         if text.contains("\x1b[?1049h") {
@@ -400,7 +405,7 @@ mod tests {
     #[test]
     fn resident_shell_contract() {
         let dir = tmp_session();
-        let mut sh = ShellSession::spawn(&dir, true).expect("spawn shell");
+        let mut sh = ShellSession::spawn(&dir, true, true).expect("spawn shell");
 
         let out = sh.run_command("echo hello123").unwrap();
         assert!(out.output.contains("hello123"), "echo 输出: {:?}", out.output);

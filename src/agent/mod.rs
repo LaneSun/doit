@@ -4,32 +4,24 @@ use std::process::Command as StdCommand;
 
 use crate::backend::DeepSeekBackend;
 use crate::block::Block;
+use crate::config::{Config, DisplayConfig};
 use crate::context::RuntimeContext;
 use crate::error::Result;
 use crate::session::Session;
 use shell::{CommandOutput, ShellSession};
 
-/// 默认 LLM 模型。
-pub const DEFAULT_MODEL: &str = "deepseek-v4-pro";
-
 pub struct Agent {
     backend: DeepSeekBackend,
+    config: Config,
 }
 
 impl Agent {
-    pub fn new(backend: DeepSeekBackend) -> Self {
-        Self { backend }
-    }
-
-    /// 从环境(DEEPSEEK_API_KEY)构造使用默认后端的 Agent。
-    pub fn from_env() -> Self {
-        let api_key = std::env::var("DEEPSEEK_API_KEY").unwrap_or_default();
-        let backend = DeepSeekBackend::new(
-            "https://api.deepseek.com".to_string(),
-            api_key,
-            DEFAULT_MODEL.to_string(),
-        );
-        Self::new(backend)
+    /// 从配置构造 Agent(后端、显示、提示覆盖等均取自 config)。
+    pub fn from_config(config: &Config) -> Self {
+        Self {
+            backend: DeepSeekBackend::from_config(config),
+            config: config.clone(),
+        }
     }
 
     /// 交互模式:先 prompt 取回用户的首个请求,再进入循环让 LLM 工作。
@@ -39,7 +31,8 @@ impl Agent {
             seq: session.next_seq(),
             content: system,
         })?;
-        let mut shell = ShellSession::spawn(&session.dir, true)?;
+        let forward = self.config.display.show_command_output;
+        let mut shell = ShellSession::spawn(&session.dir, true, forward)?;
         self.run_interactive_loop(session, &mut shell).await
     }
 
@@ -57,7 +50,7 @@ impl Agent {
             seq: session.next_seq(),
             content,
         })?;
-        let mut shell = ShellSession::spawn(&session.dir, false)?;
+        let mut shell = ShellSession::spawn(&session.dir, false, false)?;
         // 任务模式无用户回合:LLM 持续行动直到 doit exit 或停止行动
         loop {
             let mut view = TaskView::new(verbosity);
@@ -110,7 +103,7 @@ impl Agent {
 
             // —— LLM 回合:持续行动直到需要用户输入或退出 ——
             loop {
-                let mut view = InteractiveView::new();
+                let mut view = InteractiveView::new(&self.config.display);
                 match self.llm_turn(session, shell, &mut view).await? {
                     TurnOutcome::Continue => continue,
                     TurnOutcome::AwaitUser => break,
@@ -200,17 +193,40 @@ impl Agent {
         ctx: &RuntimeContext,
         interactive: bool,
     ) -> Result<String> {
-        let exe = std::env::current_exe().map_err(|e| crate::error::DoitError::io(e, "exe"))?;
-        let mut cmd = StdCommand::new(&exe);
-        cmd.args(["template", "system"]);
-        if interactive {
-            cmd.arg("--interactive");
+        let prompt = &self.config.prompt;
+        // 完全覆盖(逃生舱):配置了 system_* 则直接使用,跳过 template 生成
+        let (override_text, append_text) = if interactive {
+            (&prompt.system_interactive, &prompt.append_interactive)
+        } else {
+            (&prompt.system_task, &prompt.append_task)
+        };
+
+        let mut base = match override_text {
+            Some(text) => text.clone(),
+            None => {
+                let exe =
+                    std::env::current_exe().map_err(|e| crate::error::DoitError::io(e, "exe"))?;
+                let mut cmd = StdCommand::new(&exe);
+                cmd.args(["template", "system"]);
+                if interactive {
+                    cmd.arg("--interactive");
+                }
+                cmd.env("LANG", format!("{}.UTF-8", ctx.locale));
+                let out = cmd
+                    .output()
+                    .map_err(|_| crate::error::DoitError::shell("template generation failed"))?;
+                String::from_utf8_lossy(&out.stdout).to_string()
+            }
+        };
+
+        // 追加:在生成结果尾部加上项目自定义指令(注册表照常工作)
+        if let Some(extra) = append_text {
+            if !extra.trim().is_empty() {
+                base.push_str("\n\n");
+                base.push_str(extra);
+            }
         }
-        cmd.env("LANG", format!("{}.UTF-8", ctx.locale));
-        let out = cmd
-            .output()
-            .map_err(|_| crate::error::DoitError::shell("template generation failed"))?;
-        Ok(String::from_utf8_lossy(&out.stdout).to_string())
+        Ok(base)
     }
 }
 
@@ -368,22 +384,30 @@ enum CommandFilter {
 struct StreamRender {
     block: Option<StreamBlock>,
     cmd: CommandFilter,
-    narration: String, // 概述先到,缓冲至命令判定后再渲染或丢弃
+    narration: String,    // 概述先到,缓冲至命令判定后再渲染或丢弃
+    show_reasoning: bool,  // 显隐:思维链
+    show_narration: bool,  // 显隐:命令概述
 }
 
 impl StreamRender {
-    fn new() -> Self {
+    fn new(show_reasoning: bool, show_narration: bool) -> Self {
         Self {
             block: None,
             cmd: CommandFilter::Inactive,
             narration: String::new(),
+            show_reasoning,
+            show_narration,
         }
     }
 
     fn event(&mut self, ev: crate::backend::StreamEvent) {
         use crate::backend::StreamEvent;
         match ev {
-            StreamEvent::Reasoning(s) => self.text(BlockKind::Reasoning, s),
+            StreamEvent::Reasoning(s) => {
+                if self.show_reasoning {
+                    self.text(BlockKind::Reasoning, s)
+                }
+            }
             StreamEvent::Content(s) => self.text(BlockKind::Content, s),
             StreamEvent::Narration(s) => self.narration(s),
             StreamEvent::Command(s) => self.command(s),
@@ -410,12 +434,14 @@ impl StreamRender {
         self.narration.push_str(s);
     }
 
-    /// 把已缓冲的概述渲染为一个 # 块(与命令同样式),随后清空。
+    /// 把已缓冲的概述渲染为一个 # 块(与命令同样式),随后清空。显隐关闭时仅清空不渲染。
     fn flush_narration(&mut self) {
         if !self.narration.is_empty() {
-            let mut nb = StreamBlock::new(BlockKind::Narration);
-            nb.push(&self.narration);
-            nb.finish();
+            if self.show_narration {
+                let mut nb = StreamBlock::new(BlockKind::Narration);
+                nb.push(&self.narration);
+                nb.finish();
+            }
             self.narration.clear();
         }
     }
@@ -505,9 +531,9 @@ struct InteractiveView {
 }
 
 impl InteractiveView {
-    fn new() -> Self {
+    fn new(display: &DisplayConfig) -> Self {
         Self {
-            render: StreamRender::new(),
+            render: StreamRender::new(display.show_reasoning, display.show_narration),
         }
     }
 }

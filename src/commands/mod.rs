@@ -1,3 +1,4 @@
+pub mod config;
 pub mod edit;
 pub mod exec;
 pub mod exit;

@@ -7,3 +7,13 @@ pub fn detect_locale() -> &'static str {
     }
     "en"
 }
+
+/// 将配置中的语言代码归一化为受支持的静态字符串。
+pub fn normalize_locale(lang: &str) -> &'static str {
+    let normalized = lang.to_lowercase().replace('-', "_");
+    if normalized.starts_with("zh_cn") {
+        "zh-CN"
+    } else {
+        "en"
+    }
+}

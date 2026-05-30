@@ -30,11 +30,11 @@ pub struct Args {
     #[arg(long, default_value_t = false)]
     pub raw: bool,
 
-    /// Override max chars for head/tail truncation (default: 2000)
+    /// Override max chars for head/tail truncation (default: config output.truncate_chars)
     #[arg(long, value_name = "N")]
     pub truncate_chars: Option<usize>,
 
-    /// Override max lines for head/tail truncation (default: 50)
+    /// Override max lines for head/tail truncation (default: config output.truncate_lines)
     #[arg(long, value_name = "N")]
     pub truncate_lines: Option<usize>,
 
@@ -47,10 +47,7 @@ pub struct Args {
     pub command: Vec<String>,
 }
 
-const DEFAULT_CHARS: usize = 2000;
-const DEFAULT_LINES: usize = 50;
-
-pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
+pub async fn execute(ctx: &RuntimeContext, args: &Args) -> Result<()> {
     if args.skill {
         println!("{}", rust_i18n::t!("exec.skill"));
         return Ok(());
@@ -65,7 +62,7 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
     if args.raw {
         return run_raw(prog, cmd_args, &display);
     }
-    run_normal(prog, cmd_args, &display, args)
+    run_normal(prog, cmd_args, &display, args, &ctx.config.output)
 }
 
 /// raw 模式:继承上层 tty,交互/全屏程序与真实终端完全一致;结束后给 LLM 一行摘要。
@@ -83,7 +80,13 @@ fn run_raw(prog: &str, cmd_args: &[String], display: &str) -> Result<()> {
 }
 
 /// 常规模式:内层 PTY 捕获 → 截断 → 完整落盘 → 打印截断结果(终端 == LLM)。
-fn run_normal(prog: &str, cmd_args: &[String], display: &str, args: &Args) -> Result<()> {
+fn run_normal(
+    prog: &str,
+    cmd_args: &[String],
+    display: &str,
+    args: &Args,
+    out_cfg: &crate::config::OutputConfig,
+) -> Result<()> {
     let ws = pty::get_winsize(1); // 以本进程 stdout(上层 PTY)的尺寸作为内层 PTY 尺寸
     let (mut master, master_fd, mut child) =
         pty::spawn_on_pty(prog, cmd_args, &[], &ws)?;
@@ -184,8 +187,9 @@ fn run_normal(prog: &str, cmd_args: &[String], display: &str, args: &Args) -> Re
         std::process::exit(code);
     }
 
-    let max_chars = args.truncate_chars.unwrap_or(DEFAULT_CHARS);
-    let max_lines = args.truncate_lines.unwrap_or(DEFAULT_LINES);
+    // CLI 参数优先,否则取配置的截断阈值
+    let max_chars = args.truncate_chars.unwrap_or(out_cfg.truncate_chars);
+    let max_lines = args.truncate_lines.unwrap_or(out_cfg.truncate_lines);
     emit_truncated(&text, max_chars, max_lines);
     std::process::exit(code);
 }

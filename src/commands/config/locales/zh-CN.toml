@@ -1,0 +1,27 @@
+[config]
+user_label = "用户级"
+project_label = "项目级"
+set_done = "已设置 %{key} = %{value}  (%{path})"
+skill = """
+查看或编辑 doit 配置(分级 TOML)。
+
+用法:
+  doit config                       # 以 TOML 打印生效配置
+  doit config list                  # 同上
+  doit config path                  # 显示用户级 / 项目级配置文件路径
+  doit config get <key>             # 读取单个值(如 doit config get model.name)
+  doit config set <key> <value>          # 写入用户级配置(~/.config/doit/config.toml)
+  doit config set <key> <value> --project # 写入项目级 ./doit.toml
+
+key 为配置段的点号路径:api、model、output、display、prompt、locale。
+示例:
+  doit config get api.base_url
+  doit config set model.temperature 0.3
+  doit config set display.show_reasoning false --project
+
+输出:
+  TOML 文本(list)/ 单个值(get)/ 一行确认(set)。
+
+场景:
+  无需手工编辑文件即可查看或调整运行设置。
+"""

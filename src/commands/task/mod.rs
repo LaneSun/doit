@@ -1,4 +1,4 @@
-use crate::agent::{Agent, DEFAULT_MODEL, Verbosity};
+use crate::agent::{Agent, Verbosity};
 use crate::context::RuntimeContext;
 use crate::error::Result;
 use crate::session::Session;
@@ -40,8 +40,8 @@ pub async fn execute(ctx: &RuntimeContext, args: &Args) -> Result<()> {
     }
 
     // 子 Agent 拥有独立会话(独立目录与上下文),与父级隔离;输出按 verbosity 落到 stdout
-    let agent = Agent::from_env();
-    let mut session = Session::create(&std::env::current_dir().unwrap(), DEFAULT_MODEL)?;
+    let agent = Agent::from_config(&ctx.config);
+    let mut session = Session::create(&std::env::current_dir().unwrap(), &ctx.config.model.name)?;
     agent
         .run_task(ctx, &mut session, &task, args.verbosity)
         .await

@@ -1,0 +1,27 @@
+[config]
+user_label = "user"
+project_label = "project"
+set_done = "set %{key} = %{value}  (%{path})"
+skill = """
+View or edit doit configuration (layered TOML).
+
+Usage:
+  doit config                       # print effective config as TOML
+  doit config list                  # same as above
+  doit config path                  # show user / project config file paths
+  doit config get <key>             # read one value (e.g. doit config get model.name)
+  doit config set <key> <value>          # write to user config (~/.config/doit/config.toml)
+  doit config set <key> <value> --project # write to ./doit.toml
+
+Keys are dotted paths into the config sections: api, model, output, display, prompt, locale.
+Examples:
+  doit config get api.base_url
+  doit config set model.temperature 0.3
+  doit config set display.show_reasoning false --project
+
+Output:
+  TOML text (list) / a single value (get) / a confirmation line (set).
+
+Scenario:
+  Inspect or adjust runtime settings without hand-editing files.
+"""
