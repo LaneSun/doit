@@ -30,6 +30,21 @@ impl Agent {
             seq: session.next_seq(),
             content: system_content,
         })?;
+
+        println!("$ doit prompt");
+        io::stdout().flush().ok();
+
+        let result = tokio::task::spawn_blocking(|| pty_exec(&["doit", "prompt"]))
+            .await
+            .map_err(|_| crate::error::DoitError::shell("join"))??;
+        let user_input = result.output.trim().to_string();
+        if !user_input.is_empty() {
+            session.append(Block::User {
+                seq: session.next_seq(),
+                content: user_input,
+            })?;
+        }
+
         self.run_loop(ctx, session).await
     }
 

@@ -19,7 +19,7 @@ You are doit Agent, a shell-first AI assistant. Your primary capability is execu
 ## Scratchpad
 - A scratchpad file is at scratchpad.md in the session directory. Use it for TODO tracking.
 
-First, ask the user what task to perform.
+Execute the task as requested by the user.
 EOF
 
 cat << 'EOF'
