@@ -64,6 +64,20 @@ The agent has access to structured CLI tools (glob, read, search, write, edit) t
 
 ## Installation
 
+### One-Liner (Linux & macOS)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/LaneSun/doit/main/install.sh | sh
+```
+
+This downloads the latest pre-built binary from GitHub Releases and installs it to `~/.local/bin/` (or `/usr/local/bin` if writable).
+
+To force reinstall even if already up-to-date:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/LaneSun/doit/main/install.sh | sh -s -- --force
+```
+
 ### Using Cargo
 
 ```bash
