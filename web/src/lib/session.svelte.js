@@ -1,18 +1,38 @@
-// WebSocket session state: converts downstream WebEvent stream into renderable
-// conversation entries, plus right-panel selection state.
+// WebSocket 会话状态:把后端下行的 WebEvent 流归一化为可渲染的对话条目,
+// 并维护输入等待态与右面板选中态。返回的对象通过 getter 暴露响应式只读视图,
+// 变更只能经由内部 handler / 动作函数发生,避免视图层直接改状态。
+
+/**
+ * @typedef {Object} Entry
+ * @property {string} kind       'user'|'content'|'reasoning'|'command'|'prompt'
+ * @property {string} [text]     user/content/reasoning 的文本
+ * @property {string} [message]  prompt 的提示语
+ * @property {string} [narration] command 的概述
+ * @property {string} [command]  command 的命令行
+ * @property {string} [output]   command 的输出(可含 ANSI)
+ * @property {number} [exit_code]
+ * @property {boolean} [is_exit]
+ * @property {boolean} [expanded] 窄屏内联展开态
+ */
+
+/** 可流式累积的块类型(同类相邻增量并入同一条 entry)。 */
+const STREAM_KINDS = new Set(['reasoning', 'content']);
 
 export function createSession() {
-  let entries = $state([]);
-  let awaiting = $state(null);    // null | 'user' | 'prompt'
+  let entries = $state(/** @type {Entry[]} */ ([]));
+  let awaiting = $state(/** @type {null | 'user' | 'prompt'} */ (null));
   let ended = $state(false);
   let connected = $state(false);
-  let streamKind = null;          // current streaming block type ('reasoning' | 'content')
-  let activeIndex = $state(-1);   // selected entry index (for right panel)
+  let activeIndex = $state(-1); // 右面板选中项,-1 表示未选
 
-  // ── append streaming delta ──
+  let streamKind = null; // 当前正在累积的流式块类型
+  /** @type {WebSocket | null} */
+  let ws = null;
+
+  /** 把流式增量并入末尾同类条目,否则新建一条。 */
   function appendStream(kind, delta) {
     const last = entries[entries.length - 1];
-    if (streamKind === kind && last && last.kind === kind) {
+    if (streamKind === kind && last?.kind === kind) {
       last.text += delta;
     } else {
       entries.push({ kind, text: delta });
@@ -20,21 +40,19 @@ export function createSession() {
     }
   }
 
-  // ── process a single WebEvent ──
+  /** 处理单条下行 WebEvent。 */
   function handle(ev) {
     switch (ev.type) {
       case 'reasoning':
-        appendStream('reasoning', ev.delta);
-        break;
       case 'content':
-        appendStream('content', ev.delta);
+        appendStream(ev.type, ev.delta);
         break;
       case 'stream_end':
         streamKind = null;
         break;
-      case 'command_result': {
+      case 'command_result':
         streamKind = null;
-        const entry = {
+        entries.push({
           kind: 'command',
           narration: ev.narration,
           command: ev.command,
@@ -42,11 +60,8 @@ export function createSession() {
           exit_code: ev.exit_code,
           is_exit: ev.is_exit,
           expanded: false
-        };
-        entries.push(entry);
-        // auto-select if right panel is active
+        });
         break;
-      }
       case 'prompt':
         streamKind = null;
         entries.push({ kind: 'prompt', message: ev.message });
@@ -66,9 +81,6 @@ export function createSession() {
     }
   }
 
-  // ── WebSocket connect ──
-  let ws = null;
-
   function connect() {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     ws = new WebSocket(`${proto}://${location.host}/ws`);
@@ -78,45 +90,52 @@ export function createSession() {
       try {
         handle(JSON.parse(e.data));
       } catch {
-        /* ignore unparseable frames */
+        /* 忽略无法解析的帧 */
       }
     };
   }
 
+  /** 发送一条用户输入(顶层回合或 doit prompt 回复共用)。 */
   function send(text) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
+    if (ws?.readyState === WebSocket.OPEN) {
       ws.send(text);
       awaiting = null;
     }
   }
 
-  // ── right panel selection ──
-  function setActive(index) {
-    activeIndex = index;
+  /** 选中右面板项;传入当前项则取消选中(toggle)。 */
+  function toggleActive(index) {
+    activeIndex = activeIndex === index ? -1 : index;
   }
 
-  function clearActive() {
-    activeIndex = -1;
-  }
-
-  // ── toggle inline expansion (for when no right panel) ──
+  /** 窄屏下内联展开/折叠某条目。 */
   function toggleExpanded(index) {
     const e = entries[index];
-    if (e) {
-      e.expanded = !e.expanded;
-    }
+    if (e) e.expanded = !e.expanded;
   }
 
   return {
-    get entries() { return entries; },
-    get awaiting() { return awaiting; },
-    get ended() { return ended; },
-    get connected() { return connected; },
-    get activeIndex() { return activeIndex; },
+    get entries() {
+      return entries;
+    },
+    get awaiting() {
+      return awaiting;
+    },
+    get ended() {
+      return ended;
+    },
+    get connected() {
+      return connected;
+    },
+    get activeIndex() {
+      return activeIndex;
+    },
+    get activeEntry() {
+      return activeIndex >= 0 ? entries[activeIndex] : null;
+    },
     connect,
     send,
-    setActive,
-    clearActive,
+    toggleActive,
     toggleExpanded
   };
 }

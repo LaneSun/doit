@@ -1,4 +1,10 @@
 <script>
+  // 配置面板:读取生效配置(GET /api/config),按 section 展示标量项,
+  // 修改即写回所选层级(PUT /api/config)。仅展示标量叶子,隐藏 api_key 等敏感项。
+
+  const SECTIONS = ['api', 'model', 'output', 'display'];
+  const HIDDEN = new Set(['api.api_key']); // 不在 UI 暴露明文密钥
+
   let config = $state(null);
   let scope = $state('user');
   let status = $state('');
@@ -6,8 +12,8 @@
   async function load() {
     try {
       config = await (await fetch('/api/config')).json();
-    } catch (e) {
-      status = 'load error';
+    } catch {
+      status = 'failed to load config';
     }
   }
   load();
@@ -23,28 +29,30 @@
       config = await res.json();
       status = `saved ${key} → ${scope}`;
     } else {
-      status = 'error: ' + (await res.text());
+      status = `error: ${await res.text()}`;
     }
   }
 
-  // 仅展示标量叶子(字符串/数字/布尔),按 section 分组
-  function leaves(section, obj) {
+  // 取某 section 下的标量字段(string/number/boolean),并标注类型供渲染对应控件
+  function fields(section) {
+    const obj = config?.[section];
     if (!obj) return [];
     return Object.entries(obj)
       .filter(([, v]) => ['string', 'number', 'boolean'].includes(typeof v))
-      .map(([k, v]) => ({ key: `${section}.${k}`, name: k, value: v, type: typeof v }));
+      .map(([name, value]) => ({ key: `${section}.${name}`, name, value, type: typeof value }))
+      .filter((f) => !HIDDEN.has(f.key));
   }
 </script>
 
-<div class="flex h-full flex-col">
-  <div class="mb-3 flex items-center gap-3">
-    <span class="text-sm text-zinc-400">写入层级</span>
+<div class="flex h-full flex-col gap-4">
+  <div class="flex items-center gap-3 text-sm">
+    <span class="text-zinc-400">Write to</span>
     <select
       bind:value={scope}
-      class="rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-zinc-100"
+      class="border border-zinc-700 bg-zinc-800 px-2 py-1 text-zinc-100 focus:border-amber-500 focus:outline-none"
     >
-      <option value="user">用户级 (~/.config/doit)</option>
-      <option value="project">项目级 (./doit.toml)</option>
+      <option value="user">user (~/.config/doit)</option>
+      <option value="project">project (./doit.toml)</option>
     </select>
     {#if status}
       <span class="text-xs text-zinc-500">{status}</span>
@@ -52,18 +60,18 @@
   </div>
 
   {#if !config}
-    <p class="text-sm text-zinc-500">加载中…</p>
+    <p class="text-sm text-zinc-500">Loading…</p>
   {:else}
     <div class="flex-1 space-y-5 overflow-y-auto pr-1">
-      {#each ['api', 'model', 'output', 'display'] as section (section)}
-        <div>
+      {#each SECTIONS as section (section)}
+        <section>
           <h3 class="mb-2 font-mono text-xs uppercase tracking-wider text-amber-400/80">
             [{section}]
           </h3>
           <div class="space-y-2">
-            {#each leaves(section, config[section]) as f (f.key)}
+            {#each fields(section) as f (f.key)}
               <label class="flex items-center gap-3 text-sm">
-                <span class="w-40 shrink-0 font-mono text-zinc-400">{f.name}</span>
+                <span class="w-44 shrink-0 font-mono text-zinc-400">{f.name}</span>
                 {#if f.type === 'boolean'}
                   <input
                     type="checkbox"
@@ -77,13 +85,13 @@
                     step="any"
                     value={f.value}
                     onchange={(e) => save(f.key, e.currentTarget.value)}
-                    class="flex-1 rounded border border-zinc-700 bg-zinc-800 px-2 py-1 font-mono text-zinc-100 focus:border-amber-500 focus:outline-none"
+                    class="flex-1 border border-zinc-700 bg-zinc-800 px-2 py-1 font-mono text-zinc-100 focus:border-amber-500 focus:outline-none"
                   />
                 {/if}
               </label>
             {/each}
           </div>
-        </div>
+        </section>
       {/each}
     </div>
   {/if}
