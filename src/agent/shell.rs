@@ -316,7 +316,11 @@ impl ShellSession {
             if sig_ready {
                 let mut sbuf = [0u8; 64];
                 unsafe {
-                    libc::read(self.sigwinch_read, sbuf.as_mut_ptr() as *mut libc::c_void, 64);
+                    libc::read(
+                        self.sigwinch_read,
+                        sbuf.as_mut_ptr() as *mut libc::c_void,
+                        64,
+                    );
                 }
                 let ws = pty::get_winsize(self.stdin_fd);
                 pty::set_winsize(self.master_fd, &ws);
@@ -325,7 +329,11 @@ impl ShellSession {
             // 用户输入 → PTY
             if stdin_ready {
                 let n = unsafe {
-                    libc::read(self.stdin_fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len())
+                    libc::read(
+                        self.stdin_fd,
+                        buf.as_mut_ptr() as *mut libc::c_void,
+                        buf.len(),
+                    )
                 };
                 if n > 0 {
                     let _ = self.master.write_all(&buf[..n as usize]);
@@ -376,8 +384,6 @@ fn revents_in(fd: &PollFd) -> bool {
         .is_some_and(|r| r.intersects(PollFlags::POLLIN | PollFlags::POLLHUP))
 }
 
-
-
 impl Drop for ShellSession {
     fn drop(&mut self) {
         // 尝试让 bash 正常退出,然后回收子进程,避免僵尸
@@ -393,10 +399,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn tmp_session() -> PathBuf {
-        let d = std::env::temp_dir().join(format!(
-            "doit-test-{}",
-            uuid::Uuid::new_v4().simple()
-        ));
+        let d = std::env::temp_dir().join(format!("doit-test-{}", uuid::Uuid::new_v4().simple()));
         std::fs::create_dir_all(&d).unwrap();
         d
     }
@@ -408,7 +411,11 @@ mod tests {
         let mut sh = ShellSession::spawn(&dir, true, true).expect("spawn shell");
 
         let out = sh.run_command("echo hello123").unwrap();
-        assert!(out.output.contains("hello123"), "echo 输出: {:?}", out.output);
+        assert!(
+            out.output.contains("hello123"),
+            "echo 输出: {:?}",
+            out.output
+        );
         assert_eq!(out.exit_code, 0, "echo 退出码");
 
         let f = sh.run_command("false").unwrap();

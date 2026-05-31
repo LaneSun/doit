@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{DoitError, Result};
 
 /// 顶层配置。各 section 独立合并,子键逐项覆盖。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
     pub api: ApiConfig,
@@ -89,25 +89,12 @@ pub struct PromptConfig {
 }
 
 /// 语言设置。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct LocaleConfig {
     /// 语言代码(`zh-CN` / `en`)。留空则自动检测。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lang: Option<String>,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            api: ApiConfig::default(),
-            model: ModelConfig::default(),
-            output: OutputConfig::default(),
-            display: DisplayConfig::default(),
-            prompt: PromptConfig::default(),
-            locale: LocaleConfig::default(),
-        }
-    }
 }
 
 impl Default for ApiConfig {
@@ -149,17 +136,10 @@ impl Default for DisplayConfig {
     }
 }
 
-impl Default for LocaleConfig {
-    fn default() -> Self {
-        Self { lang: None }
-    }
-}
-
 impl Config {
     /// 用户级配置文件路径:`~/.config/doit/config.toml`。
     pub fn user_path() -> Option<PathBuf> {
-        directories::ProjectDirs::from("", "", "doit")
-            .map(|d| d.config_dir().join("config.toml"))
+        directories::ProjectDirs::from("", "", "doit").map(|d| d.config_dir().join("config.toml"))
     }
 
     /// 项目级配置文件路径:`<cwd>/doit.toml`。
@@ -229,8 +209,8 @@ fn expand_env(input: &str) -> String {
 /// 按点号路径读取单个配置值(`doit config get model.name`)。
 /// 返回该键的 TOML 标量/子表的字符串表示。
 pub fn get_value(config: &Config, key: &str) -> Result<String> {
-    let value = toml::Value::try_from(config)
-        .map_err(|e| DoitError::config(format!("serialize: {e}")))?;
+    let value =
+        toml::Value::try_from(config).map_err(|e| DoitError::config(format!("serialize: {e}")))?;
     let mut cur = &value;
     for part in key.split('.') {
         cur = cur
@@ -253,9 +233,8 @@ pub enum Scope {
 /// 使用 toml_edit 无损保留注释与格式。值按目标键的类型推断(数字/布尔/字符串)。
 pub fn set_value(scope: Scope, key: &str, value: &str) -> Result<PathBuf> {
     let path = match scope {
-        Scope::User => {
-            Config::user_path().ok_or_else(|| DoitError::config("cannot resolve user config dir"))?
-        }
+        Scope::User => Config::user_path()
+            .ok_or_else(|| DoitError::config("cannot resolve user config dir"))?,
         Scope::Project => Config::project_path(),
     };
 
@@ -323,7 +302,10 @@ mod tests {
         unsafe { std::env::set_var("DOIT_TEST_KEY", "secret123") };
         assert_eq!(expand_env("${DOIT_TEST_KEY}"), "secret123");
         assert_eq!(expand_env("plain"), "plain");
-        assert_eq!(expand_env("pre-${DOIT_TEST_KEY}-post"), "pre-secret123-post");
+        assert_eq!(
+            expand_env("pre-${DOIT_TEST_KEY}-post"),
+            "pre-secret123-post"
+        );
     }
 
     #[test]

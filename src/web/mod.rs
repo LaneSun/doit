@@ -240,7 +240,9 @@ async fn drive(
         if input.is_empty() {
             continue;
         }
-        view.sink.emit(WebEvent::UserInput { text: input.clone() });
+        view.sink.emit(WebEvent::UserInput {
+            text: input.clone(),
+        });
         session.append(Block::User {
             seq: session.next_seq(),
             content: input,
@@ -303,7 +305,10 @@ async fn ws_conn(mut socket: WebSocket, state: Arc<AppState>) {
 
 async fn send_event(socket: &mut WebSocket, ev: &WebEvent) -> std::result::Result<(), ()> {
     let json = serde_json::to_string(ev).map_err(|_| ())?;
-    socket.send(Message::Text(json.into())).await.map_err(|_| ())
+    socket
+        .send(Message::Text(json.into()))
+        .await
+        .map_err(|_| ())
 }
 
 // —— REST ——

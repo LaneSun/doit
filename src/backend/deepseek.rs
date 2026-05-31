@@ -103,40 +103,40 @@ impl DeepSeekBackend {
                 }
                 let delta = &v["choices"][0]["delta"];
 
-                if let Some(r) = delta["reasoning_content"].as_str() {
-                    if !r.is_empty() {
-                        reasoning.push_str(r);
-                        on_event(StreamEvent::Reasoning(r));
-                    }
+                if let Some(r) = delta["reasoning_content"].as_str()
+                    && !r.is_empty()
+                {
+                    reasoning.push_str(r);
+                    on_event(StreamEvent::Reasoning(r));
                 }
-                if let Some(c) = delta["content"].as_str() {
-                    if !c.is_empty() {
-                        content.push_str(c);
-                        on_event(StreamEvent::Content(c));
-                    }
+                if let Some(c) = delta["content"].as_str()
+                    && !c.is_empty()
+                {
+                    content.push_str(c);
+                    on_event(StreamEvent::Content(c));
                 }
                 if let Some(tcs) = delta["tool_calls"].as_array() {
                     saw_tool = true;
                     for tc in tcs {
-                        if let Some(id) = tc["id"].as_str() {
-                            if !id.is_empty() {
-                                tool_call_id = Some(id.to_string());
-                            }
+                        if let Some(id) = tc["id"].as_str()
+                            && !id.is_empty()
+                        {
+                            tool_call_id = Some(id.to_string());
                         }
                         if let Some(a) = tc["function"]["arguments"].as_str() {
                             args.push_str(a);
                             // narration 先于 command 解出:概述完整后才会开始流出命令
-                            if let Some(decoded) = decode_partial_field(&args, "narration") {
-                                if decoded.len() > narr_emitted {
-                                    on_event(StreamEvent::Narration(&decoded[narr_emitted..]));
-                                    narr_emitted = decoded.len();
-                                }
+                            if let Some(decoded) = decode_partial_field(&args, "narration")
+                                && decoded.len() > narr_emitted
+                            {
+                                on_event(StreamEvent::Narration(&decoded[narr_emitted..]));
+                                narr_emitted = decoded.len();
                             }
-                            if let Some(decoded) = decode_partial_field(&args, "command") {
-                                if decoded.len() > cmd_emitted {
-                                    on_event(StreamEvent::Command(&decoded[cmd_emitted..]));
-                                    cmd_emitted = decoded.len();
-                                }
+                            if let Some(decoded) = decode_partial_field(&args, "command")
+                                && decoded.len() > cmd_emitted
+                            {
+                                on_event(StreamEvent::Command(&decoded[cmd_emitted..]));
+                                cmd_emitted = decoded.len();
                             }
                         }
                     }
@@ -222,7 +222,6 @@ impl DeepSeekBackend {
             }
         })
     }
-
 }
 
 /// 从增量累积的工具调用参数 JSON 中,解码出指定字段当前可安全确定的字符串前缀。

@@ -57,10 +57,10 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
     }
 
     // 可选消息(LLM 手工 prompt 的提问)渲染为橘色内容块,与 content 路径外观一致
-    if let Some(message) = &args.message {
-        if !message.is_empty() {
-            render_content_block(message);
-        }
+    if let Some(message) = &args.message
+        && !message.is_empty()
+    {
+        render_content_block(message);
     }
 
     print_divider();

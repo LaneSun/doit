@@ -223,11 +223,11 @@ impl Agent {
         };
 
         // 追加:在生成结果尾部加上项目自定义指令(注册表照常工作)
-        if let Some(extra) = append_text {
-            if !extra.trim().is_empty() {
-                base.push_str("\n\n");
-                base.push_str(extra);
-            }
+        if let Some(extra) = append_text
+            && !extra.trim().is_empty()
+        {
+            base.push_str("\n\n");
+            base.push_str(extra);
         }
         Ok(base)
     }
@@ -388,8 +388,8 @@ struct StreamRender {
     block: Option<StreamBlock>,
     cmd: CommandFilter,
     narration: String,    // 概述先到,缓冲至命令判定后再渲染或丢弃
-    show_reasoning: bool,  // 显隐:思维链
-    show_narration: bool,  // 显隐:命令概述
+    show_reasoning: bool, // 显隐:思维链
+    show_narration: bool, // 显隐:命令概述
 }
 
 impl StreamRender {
@@ -502,14 +502,14 @@ impl StreamRender {
 
     fn finish(&mut self) {
         // 未判定的缓冲(命令在判定前结束)按普通命令渲染
-        if let CommandFilter::Buffering(buf) = &self.cmd {
-            if !buf.is_empty() {
-                let buf = buf.clone();
-                self.flush_narration();
-                let mut block = StreamBlock::new(BlockKind::Command);
-                block.push(&buf);
-                self.block = Some(block);
-            }
+        if let CommandFilter::Buffering(buf) = &self.cmd
+            && !buf.is_empty()
+        {
+            let buf = buf.clone();
+            self.flush_narration();
+            let mut block = StreamBlock::new(BlockKind::Command);
+            block.push(&buf);
+            self.block = Some(block);
         }
         self.narration.clear(); // 丢弃无对应命令的残留概述
         self.cmd = CommandFilter::Inactive;

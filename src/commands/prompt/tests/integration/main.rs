@@ -21,10 +21,7 @@ fn prompt_reads_tty_and_writes_reply() {
     use std::time::Duration;
 
     let bin = assert_cmd::cargo::cargo_bin("doit");
-    let session_dir = std::env::temp_dir().join(format!(
-        "doit-prompt-test-{}",
-        std::process::id()
-    ));
+    let session_dir = std::env::temp_dir().join(format!("doit-prompt-test-{}", std::process::id()));
     std::fs::create_dir_all(&session_dir).unwrap();
 
     // 开一个 PTY,子进程的 stdio 接到 slave(即一个真实 tty)

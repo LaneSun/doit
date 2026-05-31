@@ -56,8 +56,13 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
             do_line_replace(&original_lines, start, end, &new_content, file)?;
         let ctx_start = start.saturating_sub(CONTEXT);
         let ctx_end = (start + changed_len + CONTEXT).min(result_lines.len());
-        for i in ctx_start..ctx_end {
-            println!("{}:{}: {}", file_name, i + 1, result_lines[i]);
+        for (i, line) in result_lines
+            .iter()
+            .enumerate()
+            .take(ctx_end)
+            .skip(ctx_start)
+        {
+            println!("{}:{}: {}", file_name, i + 1, line);
         }
     } else if let (Some(pattern), Some(replacement)) =
         (args.regex.as_deref(), args.replace.as_deref())
@@ -98,8 +103,13 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
             do_diff_replace(&original_lines, &stdin, file)?;
         let ctx_start = changed_start.saturating_sub(CONTEXT);
         let ctx_end = (changed_start + changed_len + CONTEXT).min(result_lines.len());
-        for i in ctx_start..ctx_end {
-            println!("{}:{}: {}", file_name, i + 1, result_lines[i]);
+        for (i, line) in result_lines
+            .iter()
+            .enumerate()
+            .take(ctx_end)
+            .skip(ctx_start)
+        {
+            println!("{}:{}: {}", file_name, i + 1, line);
         }
     }
 

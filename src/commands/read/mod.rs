@@ -53,15 +53,15 @@ pub async fn execute(_ctx: &RuntimeContext, args: &Args) -> Result<()> {
         if line_num > end {
             break;
         }
-        if let Some(limit) = limit {
-            if count >= limit {
-                let hidden = (end - start + 1).saturating_sub(limit);
-                if hidden > 0 {
-                    let msg = rust_i18n::t!("read.truncated");
-                    println!("{}", msg.replace("%{hidden}", &hidden.to_string()));
-                }
-                break;
+        if let Some(limit) = limit
+            && count >= limit
+        {
+            let hidden = (end - start + 1).saturating_sub(limit);
+            if hidden > 0 {
+                let msg = rust_i18n::t!("read.truncated");
+                println!("{}", msg.replace("%{hidden}", &hidden.to_string()));
             }
+            break;
         }
         println!("{}: {}", line_num, line);
         count += 1;
@@ -82,14 +82,14 @@ fn parse_range(s: &str) -> Result<(usize, usize)> {
                 .parse()
                 .map_err(|_| crate::error::DoitError::config(format!("invalid end: {b}")))?;
             if start < 1 || end < 1 {
-                return Err(crate::error::DoitError::config(format!(
-                    "line numbers must be >= 1"
-                )));
+                return Err(crate::error::DoitError::config(
+                    "line numbers must be >= 1".to_string(),
+                ));
             }
             if start > end {
-                return Err(crate::error::DoitError::config(format!(
-                    "start must be <= end"
-                )));
+                return Err(crate::error::DoitError::config(
+                    "start must be <= end".to_string(),
+                ));
             }
             Ok((start, end))
         })?;

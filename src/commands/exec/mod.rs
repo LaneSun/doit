@@ -88,8 +88,7 @@ fn run_normal(
     out_cfg: &crate::config::OutputConfig,
 ) -> Result<()> {
     let ws = pty::get_winsize(1); // 以本进程 stdout(上层 PTY)的尺寸作为内层 PTY 尺寸
-    let (mut master, master_fd, mut child) =
-        pty::spawn_on_pty(prog, cmd_args, &[], &ws)?;
+    let (mut master, master_fd, mut child) = pty::spawn_on_pty(prog, cmd_args, &[], &ws)?;
     let sigwinch_read = pty::install_sigwinch_pipe()?;
     let stdin_fd = std::io::stdin().as_raw_fd();
 
@@ -108,7 +107,8 @@ fn run_normal(
             if stdin_open {
                 fds.push(PollFd::new(stdin_bfd, PollFlags::POLLIN));
             }
-            poll(&mut fds, PollTimeout::NONE).map_err(|e| DoitError::shell(format!("poll: {e}")))?;
+            poll(&mut fds, PollTimeout::NONE)
+                .map_err(|e| DoitError::shell(format!("poll: {e}")))?;
             let stdin_ready = stdin_open
                 && fds
                     .get(2)
@@ -265,11 +265,7 @@ fn build_tail(lines: &[&str], max_lines: usize, max_chars: usize) -> String {
 }
 
 fn count_lines(s: &str) -> usize {
-    if s.is_empty() {
-        0
-    } else {
-        s.lines().count()
-    }
+    if s.is_empty() { 0 } else { s.lines().count() }
 }
 
 fn visible_len(s: &str) -> usize {

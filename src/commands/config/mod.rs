@@ -55,8 +55,16 @@ pub async fn execute(ctx: &RuntimeContext, args: &Args) -> Result<()> {
         Some(Action::Get { key }) => {
             println!("{}", config::get_value(&ctx.config, key)?);
         }
-        Some(Action::Set { key, value, project }) => {
-            let scope = if *project { Scope::Project } else { Scope::User };
+        Some(Action::Set {
+            key,
+            value,
+            project,
+        }) => {
+            let scope = if *project {
+                Scope::Project
+            } else {
+                Scope::User
+            };
             let path = config::set_value(scope, key, value)?;
             // 校验写入结果可被重新加载
             Config::load(None).map_err(|e| {
