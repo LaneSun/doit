@@ -2,6 +2,8 @@
   // 配置面板:读取生效配置(GET /api/config),按 section 展示标量项,
   // 修改即写回所选层级(PUT /api/config)。仅展示标量叶子,隐藏 api_key 等敏感项。
 
+  import { onMount } from 'svelte';
+
   const SECTIONS = ['api', 'model', 'output', 'display'];
   const HIDDEN = new Set(['api.api_key']); // 不在 UI 暴露明文密钥
 
@@ -16,7 +18,7 @@
       status = 'failed to load config';
     }
   }
-  load();
+  onMount(load);
 
   async function save(key, value) {
     status = 'saving…';
@@ -49,7 +51,7 @@
     <span class="text-zinc-400">Write to</span>
     <select
       bind:value={scope}
-      class="border border-zinc-700 bg-zinc-800 px-2 py-1 text-zinc-100 focus:border-amber-500 focus:outline-none"
+      class="border border-zinc-700 bg-zinc-800 px-2 py-1 text-zinc-100 focus:border-accent focus:outline-none"
     >
       <option value="user">user (~/.config/doit)</option>
       <option value="project">project (./doit.toml)</option>
@@ -77,7 +79,7 @@
                     type="checkbox"
                     checked={f.value}
                     onchange={(e) => save(f.key, e.currentTarget.checked)}
-                    class="h-4 w-4 accent-amber-500"
+                    class="h-4 w-4 accent-accent"
                   />
                 {:else}
                   <input
@@ -85,7 +87,7 @@
                     step="any"
                     value={f.value}
                     onchange={(e) => save(f.key, e.currentTarget.value)}
-                    class="flex-1 border border-zinc-700 bg-zinc-800 px-2 py-1 font-mono text-zinc-100 focus:border-amber-500 focus:outline-none"
+                    class="flex-1 border border-zinc-700 bg-zinc-800 px-2 py-1 font-mono text-zinc-100 focus:border-accent focus:outline-none"
                   />
                 {/if}
               </label>

@@ -1,34 +1,20 @@
 <script>
-  // 一条 entry 的主体内容(不含图标/竖条/折叠外壳),按 kind 分发渲染。
-  // 列表的展开态与右侧详情面板共用本组件,保证两处呈现一致(DRY)。
+  // 统一内容渲染器:按注册表 meta.body 动态渲染条目内容,列表展开态与详情侧栏共用。
+  // bare 类型(终端)不加包裹边距;fill 透传给支持占满容器的内容组件(CommandView)。
 
-  import Markdown from './Markdown.svelte';
-  import CommandView from './CommandView.svelte';
+  import { entryMeta } from '$lib/entries.js';
 
-  let { entry } = $props();
+  let { entry, fill = false } = $props();
+
+  const meta = $derived(entryMeta(entry.kind));
+  const Body = $derived(meta.body);
+  const bodyProps = $derived(meta.bodyProps(entry, { fill }));
 </script>
 
-{#if entry.kind === 'command'}
-  <CommandView
-    narration={entry.narration}
-    command={entry.command}
-    output={entry.output}
-    exitCode={entry.exit_code}
-  />
-{:else if entry.kind === 'content'}
-  <div class="py-1.5 pr-2 text-sm text-zinc-100">
-    <Markdown text={entry.text} />
-  </div>
-{:else if entry.kind === 'reasoning'}
-  <div class="py-1.5 pr-2 text-xs text-zinc-500">
-    <Markdown text={entry.text} />
-  </div>
-{:else if entry.kind === 'user'}
-  <div class="py-1.5 pr-2">
-    <span class="text-sm whitespace-pre-wrap text-zinc-300">{entry.text}</span>
-  </div>
-{:else if entry.kind === 'prompt'}
-  <div class="py-1.5 pr-2">
-    <span class="text-sm whitespace-pre-wrap text-amber-200">{entry.message}</span>
+{#if meta.bare}
+  <Body {...bodyProps} />
+{:else}
+  <div class="py-1.5 pr-2 {meta.bodyClass ?? ''}">
+    <Body {...bodyProps} />
   </div>
 {/if}

@@ -49,22 +49,29 @@
     <PaneGroup direction="horizontal" autoSaveId="doit-panels" class="min-h-0 flex-1 overflow-hidden">
       <Pane defaultSize={60} minSize={30}>
         <div class="flex h-full flex-col">
-          <ConversationList {session} {wide} />
+          <ConversationList {session} detail={showDetail} />
         </div>
       </Pane>
 
-      <PaneResizer class="w-px bg-zinc-800 transition-colors hover:bg-amber-500" />
+      <PaneResizer class="w-px bg-zinc-800 transition-colors hover:bg-accent" />
 
       <Pane defaultSize={40} minSize={15}>
         <div class="flex h-full flex-col border-l border-zinc-800">
           {#if session.activeEntry}
-            <div
-              class="flex-1 overflow-y-auto {session.activeEntry.kind === 'command' ? '' : 'pl-2'}"
-            >
-              {#key session.activeIndex}
-                <EntryBody entry={session.activeEntry} />
-              {/key}
-            </div>
+            {#if session.activeEntry.kind === 'command'}
+              <!-- 命令:终端占满侧栏高宽,输出超出则在终端内部滚动 -->
+              <div class="min-h-0 flex-1">
+                {#key session.activeIndex}
+                  <EntryBody entry={session.activeEntry} fill />
+                {/key}
+              </div>
+            {:else}
+              <div class="min-h-0 flex-1 overflow-y-auto pl-2">
+                {#key session.activeIndex}
+                  <EntryBody entry={session.activeEntry} />
+                {/key}
+              </div>
+            {/if}
           {:else}
             <div class="flex h-full items-center justify-center">
               <span class="text-xs text-zinc-600">Select an entry to view details</span>
@@ -75,7 +82,7 @@
     </PaneGroup>
   {:else}
     <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <ConversationList {session} {wide} />
+      <ConversationList {session} detail={showDetail} />
     </div>
   {/if}
 
@@ -90,5 +97,5 @@
 </div>
 
 {#if showSettings}
-  <SettingsModal onclose={() => (showSettings = false)} />
+  <SettingsModal onClose={() => (showSettings = false)} />
 {/if}

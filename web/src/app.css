@@ -1,6 +1,12 @@
 @import 'tailwindcss';
 
-/* ── Global: zero-radius, zero-shadow, tight spacing ── */
+/* 强调色(橘):竖条、图标、光标、聚焦描边、分隔条等线性强调统一引用此 token。
+   生成 text-accent / bg-accent / border-accent 等工具类,亦可用 var(--color-accent)。 */
+@theme {
+  --color-accent: #f59e0b; /* amber-500 */
+}
+
+/* ── 全局:无圆角、无阴影(终端风) ── */
 *,
 *::before,
 *::after {
@@ -8,13 +14,13 @@
   box-shadow: none !important;
 }
 
-/* Preserve focus-visible outline for accessibility */
+/* 聚焦可见性:统一用强调色描边 */
 *:focus-visible {
-  outline: 2px solid #d97706;
+  outline: 2px solid var(--color-accent);
   outline-offset: 1px;
 }
 
-/* ── Scrollbar: subtle dark ── */
+/* ── 滚动条:中性暗色 ── */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -29,14 +35,15 @@
   background: #52525b;
 }
 
-/* ── Selection ── */
+/* 选区:深橘块底 + 亮字(块状高亮,独立于线性强调,保证可读) */
 ::selection {
   background: #b45309;
   color: #fafafa;
 }
 
-/* ── Body ── */
-html, body {
+/* ── 文档基底 ── */
+html,
+body {
   margin: 0;
   padding: 0;
   overflow: hidden;

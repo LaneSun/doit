@@ -1,15 +1,14 @@
 <script>
   // 对话流:逐条渲染 entry + 末尾输入框,并在贴近底部时自动滚动。
   // 折叠/可点击/选中等呈现策略集中在此,ConversationEntry 只负责画出来。
+  // detail=是否处于「详情面板可见」模式(双栏且侧栏未隐藏);否则就地展开。
 
   import { tick } from 'svelte';
+  import { entryMeta } from '$lib/entries.js';
   import ConversationEntry from './ConversationEntry.svelte';
   import Composer from './Composer.svelte';
 
-  let { session, wide = false } = $props();
-
-  const COLLAPSIBLE = new Set(['reasoning', 'command']);
-  const CLICKABLE = new Set(['content', 'reasoning', 'command']);
+  let { session, detail = false } = $props();
 
   let scroller;
 
@@ -27,13 +26,13 @@
     });
   });
 
-  // 宽屏:可折叠项折叠成单行,详情在右面板;窄屏:就地展开
-  const isExpanded = (e) => !COLLAPSIBLE.has(e.kind) || (!wide && e.expanded);
-  // 宽屏:正文类均可点击进入详情;窄屏:仅可折叠项可点击展开
-  const isClickable = (e) => (wide ? CLICKABLE.has(e.kind) : COLLAPSIBLE.has(e.kind));
+  // 详情模式:可折叠项折叠成单行,详情在右面板;否则(单栏或侧栏隐藏)就地展开
+  const isExpanded = (e) => !entryMeta(e.kind).collapsible || (!detail && e.expanded);
+  // 详情模式:可进详情的条目可点击;否则仅可折叠项可点击展开
+  const isClickable = (e) => (detail ? entryMeta(e.kind).detail : entryMeta(e.kind).collapsible);
 
   function onEntryClick(i) {
-    if (wide) session.toggleActive(i);
+    if (detail) session.toggleActive(i);
     else session.toggleExpanded(i);
   }
 
@@ -55,11 +54,11 @@
       {entry}
       expanded={isExpanded(entry)}
       clickable={isClickable(entry)}
-      active={wide && session.activeIndex === i}
-      onclick={() => onEntryClick(i)}
+      active={detail && session.activeIndex === i}
+      onClick={() => onEntryClick(i)}
     />
     <div class="border-t border-zinc-900"></div>
   {/each}
 
-  <Composer {placeholder} disabled={inputDisabled} onsubmit={(t) => session.send(t)} />
+  <Composer {placeholder} disabled={inputDisabled} onSubmit={(t) => session.send(t)} />
 </div>
