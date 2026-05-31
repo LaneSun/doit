@@ -75,6 +75,21 @@ jobs:
         with:
           toolchain: stable
 
+      - name: Install bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build web frontend
+        run: |
+          cd web
+          bun install
+          bun run build
+          cd ..
+
+      - name: Stage web assets (override .gitignore)
+        run: git add -f web/build/
+
       - name: Cache cargo dependencies
         uses: actions/cache@v4
         with:
@@ -88,10 +103,10 @@ jobs:
         run: cargo check
 
       - name: Verify package
-        run: cargo publish --dry-run
+        run: cargo publish --dry-run --allow-dirty
 
       - name: Publish to crates.io
-        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }} --allow-dirty
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
