@@ -1,12 +1,15 @@
-// WebSocket 会话状态:把下行 WebEvent 流转换为可渲染的对话条目。
+// WebSocket session state: converts downstream WebEvent stream into renderable
+// conversation entries, plus right-panel selection state.
+
 export function createSession() {
   let entries = $state([]);
-  let awaiting = $state(null); // null | 'user' | 'prompt'
+  let awaiting = $state(null);    // null | 'user' | 'prompt'
   let ended = $state(false);
   let connected = $state(false);
-  let streamKind = null; // 当前正在流式的块类型('reasoning' | 'content')
-  let ws = null;
+  let streamKind = null;          // current streaming block type ('reasoning' | 'content')
+  let activeIndex = $state(-1);   // selected entry index (for right panel)
 
+  // ── append streaming delta ──
   function appendStream(kind, delta) {
     const last = entries[entries.length - 1];
     if (streamKind === kind && last && last.kind === kind) {
@@ -17,6 +20,7 @@ export function createSession() {
     }
   }
 
+  // ── process a single WebEvent ──
   function handle(ev) {
     switch (ev.type) {
       case 'reasoning':
@@ -28,18 +32,21 @@ export function createSession() {
       case 'stream_end':
         streamKind = null;
         break;
-      case 'command_result':
+      case 'command_result': {
         streamKind = null;
-        entries.push({
+        const entry = {
           kind: 'command',
           narration: ev.narration,
           command: ev.command,
           output: ev.output,
           exit_code: ev.exit_code,
           is_exit: ev.is_exit,
-          collapsed: true
-        });
+          expanded: false
+        };
+        entries.push(entry);
+        // auto-select if right panel is active
         break;
+      }
       case 'prompt':
         streamKind = null;
         entries.push({ kind: 'prompt', message: ev.message });
@@ -59,6 +66,9 @@ export function createSession() {
     }
   }
 
+  // ── WebSocket connect ──
+  let ws = null;
+
   function connect() {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     ws = new WebSocket(`${proto}://${location.host}/ws`);
@@ -68,7 +78,7 @@ export function createSession() {
       try {
         handle(JSON.parse(e.data));
       } catch {
-        /* 忽略无法解析的帧 */
+        /* ignore unparseable frames */
       }
     };
   }
@@ -80,20 +90,33 @@ export function createSession() {
     }
   }
 
+  // ── right panel selection ──
+  function setActive(index) {
+    activeIndex = index;
+  }
+
+  function clearActive() {
+    activeIndex = -1;
+  }
+
+  // ── toggle inline expansion (for when no right panel) ──
+  function toggleExpanded(index) {
+    const e = entries[index];
+    if (e) {
+      e.expanded = !e.expanded;
+    }
+  }
+
   return {
-    get entries() {
-      return entries;
-    },
-    get awaiting() {
-      return awaiting;
-    },
-    get ended() {
-      return ended;
-    },
-    get connected() {
-      return connected;
-    },
+    get entries() { return entries; },
+    get awaiting() { return awaiting; },
+    get ended() { return ended; },
+    get connected() { return connected; },
+    get activeIndex() { return activeIndex; },
     connect,
-    send
+    send,
+    setActive,
+    clearActive,
+    toggleExpanded
   };
 }

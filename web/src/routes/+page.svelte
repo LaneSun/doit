@@ -1,17 +1,41 @@
 <script>
   import { onMount, tick } from 'svelte';
   import { createSession } from '$lib/session.svelte.js';
-  import ConfigPanel from '$lib/ConfigPanel.svelte';
+  import XtermOutput from '$lib/XtermOutput.svelte';
+  import Markdown    from '$lib/Markdown.svelte';
+  import { PaneGroup, Pane, PaneResizer } from 'paneforge';
+
+  // ── icons ──
+  import ChevronRight   from 'lucide-svelte/icons/chevron-right';
+  import TerminalIcon   from 'lucide-svelte/icons/terminal';
+  import Brain          from 'lucide-svelte/icons/brain';
+  import Sparkles       from 'lucide-svelte/icons/sparkles';
+  import MessageSquare  from 'lucide-svelte/icons/message-square';
+  import PanelRight     from 'lucide-svelte/icons/panel-right';
+  import PanelRightClose from 'lucide-svelte/icons/panel-right-close';
+  import Settings       from 'lucide-svelte/icons/settings';
 
   const session = createSession();
+
+  // ── meta ──
   let meta = $state({ model: '', thinking: false, context_chars: 0 });
-  let showConfig = $state(false);
+
+  // ── viewport ──
+  let wide = $state(false);
+  let rightCollapsed = $state(false);
+  const canUseRightPanel = $derived(wide && !rightCollapsed);
+
+  // ── input ──
   let draft = $state('');
   let scroller;
 
+  // ── lifecycle ──
   onMount(() => {
     session.connect();
     refreshMeta();
+    const mq = window.matchMedia('(min-width: 1200px)');
+    wide = mq.matches;
+    mq.onchange = (e) => (wide = e.matches);
     const id = setInterval(refreshMeta, 3000);
     return () => clearInterval(id);
   });
@@ -19,19 +43,29 @@
   async function refreshMeta() {
     try {
       meta = await (await fetch('/api/meta')).json();
-    } catch {
-      /* 服务未就绪时忽略 */
-    }
+    } catch { /* server not ready */ }
   }
 
-  // 新条目到达后滚动到底部
+  // ── auto-scroll ──
   $effect(() => {
     session.entries.length;
     tick().then(() => {
-      if (scroller) scroller.scrollTop = scroller.scrollHeight;
+      if (!scroller) return;
+      const atBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 80;
+      if (atBottom) scroller.scrollTop = scroller.scrollHeight;
     });
   });
 
+  // ── entry click ──
+  function onEntryClick(i) {
+    if (canUseRightPanel) {
+      session.setActive(session.activeIndex === i ? -1 : i);
+    } else {
+      session.toggleExpanded(i);
+    }
+  }
+
+  // ── input ──
   function submit() {
     const text = draft.trim();
     if (!text || !session.awaiting) return;
@@ -40,7 +74,6 @@
   }
 
   function onKey(e) {
-    // Enter 发送,Shift+Enter 换行
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       submit();
@@ -49,120 +82,300 @@
 
   const placeholder = $derived(
     session.ended
-      ? '会话已结束'
+      ? 'Session ended'
       : session.awaiting === 'prompt'
-        ? '回复 Agent 的提问…'
+        ? 'Reply to agent…'
         : session.awaiting === 'user'
-          ? '输入你的请求…'
-          : 'Agent 工作中…'
+          ? 'Type your request…'
+          : 'Agent working…'
   );
+
+  const activeEntry = $derived(
+    session.activeIndex >= 0 ? session.entries[session.activeIndex] : null
+  );
+
+  // ── per-type config ──
+  function entryCfg(kind) {
+    switch (kind) {
+      case 'user':      return { bar: '#f59e0b', icon: ChevronRight,  textColor: 'text-amber-500', alwaysExpanded: true,  clickable: false };
+      case 'content':   return { bar: '#d4d4d8', icon: Sparkles,      textColor: 'text-zinc-300',  alwaysExpanded: true,  clickable: true  };
+      case 'reasoning': return { bar: 'rgba(113,113,122,0.4)', icon: Brain,         textColor: 'text-zinc-500',  alwaysExpanded: false, clickable: true  };
+      case 'command':   return { bar: 'rgba(96,165,250,0.4)', icon: TerminalIcon,  textColor: 'text-blue-400',  alwaysExpanded: false, clickable: true  };
+      case 'prompt':    return { bar: '#fde68a', icon: MessageSquare, textColor: 'text-amber-200', alwaysExpanded: true,  clickable: false };
+      default:          return { bar: '#3f3f46', icon: Sparkles,      textColor: 'text-zinc-500',  alwaysExpanded: true,  clickable: false };
+    }
+  }
 </script>
 
-<div class="flex h-screen flex-col bg-zinc-950 text-zinc-100">
-  <!-- 顶部元信息条 -->
-  <header
-    class="flex items-center justify-between border-b border-zinc-800 bg-zinc-900/60 px-4 py-2 text-sm"
-  >
-    <div class="flex items-center gap-3">
-      <span class="font-mono font-semibold text-amber-400">doit</span>
-      <span
-        class="inline-block h-2 w-2 rounded-full {session.connected
-          ? 'bg-emerald-500'
-          : 'bg-zinc-600'}"
-        title={session.connected ? 'connected' : 'disconnected'}
-      ></span>
-    </div>
-    <div class="flex items-center gap-4 text-zinc-400">
-      <span class="font-mono">{meta.model}</span>
-      <span title="reasoning">🧠 {meta.thinking ? 'on' : 'off'}</span>
-      <span title="approx context chars">ctx ≈ {meta.context_chars.toLocaleString()}</span>
-      <button
-        class="rounded border border-zinc-700 px-2 py-0.5 hover:bg-zinc-800"
-        onclick={() => (showConfig = !showConfig)}
-      >
-        {showConfig ? '对话' : '配置'}
-      </button>
-    </div>
-  </header>
+<!-- ═══════════════ left-panel snippet ═══════════════ -->
+{#snippet leftPanelContent()}
+  <div class="flex flex-col flex-1 min-w-0">
+    <div bind:this={scroller} class="flex-1 overflow-y-auto">
 
-  {#if showConfig}
-    <div class="flex-1 overflow-hidden p-4">
-      <ConfigPanel />
-    </div>
-  {:else}
-    <!-- 对话流 -->
-    <div bind:this={scroller} class="flex-1 space-y-2 overflow-y-auto px-4 py-4">
       {#each session.entries as e, i (i)}
-        {#if e.kind === 'reasoning'}
-          <pre class="whitespace-pre-wrap font-mono text-sm italic text-zinc-500">{e.text}</pre>
-        {:else if e.kind === 'content'}
-          <div
-            class="whitespace-pre-wrap rounded bg-amber-950/40 px-3 py-2 text-sm leading-relaxed text-zinc-100"
-          >
-            {e.text}
-          </div>
-        {:else if e.kind === 'user'}
-          <div class="flex gap-2 border-l-2 border-amber-500 bg-zinc-900/40 px-3 py-2">
-            <span class="font-mono text-amber-500">&gt;</span>
-            <span class="whitespace-pre-wrap font-mono text-sm">{e.text}</span>
-          </div>
-        {:else if e.kind === 'prompt'}
-          <div class="whitespace-pre-wrap rounded bg-amber-950/40 px-3 py-2 text-sm text-amber-100">
-            {e.message}
-          </div>
-        {:else if e.kind === 'command'}
-          <div class="overflow-hidden rounded border-l-2 border-blue-500 bg-zinc-900/70">
-            {#if e.narration}
-              <div class="px-3 pt-2 font-mono text-xs text-zinc-400"># {e.narration}</div>
-            {/if}
-            <button
-              class="flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-sm hover:bg-zinc-800/50"
-              onclick={() => (e.collapsed = !e.collapsed)}
+        {@const cfg = entryCfg(e.kind)}
+        {@const expanded = cfg.alwaysExpanded || (!canUseRightPanel && e.expanded)}
+        {@const isActive = canUseRightPanel && session.activeIndex === i}
+
+        <!-- full-width wrapper: color bar flush to viewport/pane edge -->
+        <div class="relative {isActive ? 'bg-zinc-800/60' : ''}">
+          <div class="absolute left-0 top-0 bottom-0 w-0.5" style="background:{cfg.bar}"></div>
+
+          <div class="max-w-[700px] mx-auto">
+            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+            <div
+              class="{cfg.clickable ? 'cursor-pointer' : ''}"
+              onclick={cfg.clickable ? () => onEntryClick(i) : undefined}
+              role={cfg.clickable ? 'button' : undefined}
+              tabindex={cfg.clickable ? 0 : -1}
             >
-              <span class="text-blue-400">$</span>
-              <span class="flex-1 truncate">{e.command}</span>
-              {#if e.exit_code !== 0}
-                <span class="text-red-400">[{e.exit_code}]</span>
+              <!-- ═════════ user · always expanded ═════════ -->
+              {#if e.kind === 'user'}
+                <div class="flex items-start gap-2 pl-2 min-h-9">
+                  <div class="shrink-0 w-6 flex justify-center pt-[11px]">
+                    <ChevronRight size={14} class="text-amber-500" />
+                  </div>
+                  <div class="flex-1 min-w-0 py-1.5 pr-2">
+                    <span class="whitespace-pre-wrap text-sm text-zinc-300">{e.text}</span>
+                  </div>
+                </div>
+
+              <!-- ═════════ content · always expanded ═════════ -->
+              {:else if e.kind === 'content'}
+                <div class="flex items-start gap-2 pl-2 min-h-9">
+                  <div class="shrink-0 w-6 flex justify-center pt-[11px]">
+                    <Sparkles size={14} class="text-zinc-300" />
+                  </div>
+                  <div class="flex-1 min-w-0 py-1.5 pr-2">
+                    <Markdown text={e.text} />
+                  </div>
+                </div>
+
+              <!-- ═════════ reasoning ═════════ -->
+              {:else if e.kind === 'reasoning'}
+                {#if expanded}
+                  <div class="flex items-start gap-2 pl-2 min-h-9">
+                    <div class="shrink-0 w-6 flex justify-center pt-[11px]">
+                      <Brain size={14} class="text-zinc-500" />
+                    </div>
+                    <div class="flex-1 min-w-0 py-1.5 pr-2 text-xs text-zinc-500">
+                      <Markdown text={e.text} />
+                    </div>
+                  </div>
+                {:else}
+                  <div class="flex items-center gap-2 h-9 pl-2">
+                    <div class="shrink-0 w-6 flex items-center justify-center h-full">
+                      <Brain size={14} class="text-zinc-500" />
+                    </div>
+                    <span class="flex-1 text-xs text-zinc-600 truncate">{e.text.slice(0, 100)}</span>
+                  </div>
+                {/if}
+
+              <!-- ═════════ command ═════════ -->
+              {:else if e.kind === 'command'}
+                {#if expanded}
+                  <div class="flex items-start gap-2 pl-2 min-h-9">
+                    <div class="shrink-0 w-6 flex justify-center pt-[11px]">
+                      <TerminalIcon size={14} class="text-blue-400" />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div role="presentation" onpointerdown={(ev) => ev.stopPropagation()} onclick={(ev) => ev.stopPropagation()} onkeydown={(ev) => ev.stopPropagation()}>
+                        <XtermOutput text={e.output} narration={e.narration} command={e.command} exitCode={e.exit_code} />
+                      </div>
+                    </div>
+                  </div>
+                {:else}
+                  <div class="flex items-center gap-2 h-9 pl-2">
+                    <div class="shrink-0 w-6 flex items-center justify-center h-full">
+                      <TerminalIcon size={14} class="text-blue-400" />
+                    </div>
+                    {#if e.narration}
+                      <span class="flex-1 text-xs text-zinc-600 truncate">{e.narration}</span>
+                    {:else}
+                      <span class="flex-1 text-xs text-zinc-600 truncate">{e.command}</span>
+                    {/if}
+                    {#if e.exit_code !== 0}
+                      <span class="shrink-0 text-xs text-red-400">[{e.exit_code}]</span>
+                    {/if}
+                  </div>
+                {/if}
+
+              <!-- ═════════ prompt · always expanded ═════════ -->
+              {:else if e.kind === 'prompt'}
+                <div class="flex items-start gap-2 pl-2 min-h-9">
+                  <div class="shrink-0 w-6 flex justify-center pt-[11px]">
+                    <MessageSquare size={14} class="text-amber-200" />
+                  </div>
+                  <div class="flex-1 min-w-0 py-1.5 pr-2">
+                    <span class="whitespace-pre-wrap text-sm text-amber-200">{e.message}</span>
+                  </div>
+                </div>
               {/if}
-              <span class="text-zinc-600">{e.collapsed ? '▸' : '▾'}</span>
-            </button>
-            {#if !e.collapsed && e.output.trim()}
-              <pre
-                class="max-h-96 overflow-auto border-t border-zinc-800 bg-black/30 px-3 py-2 font-mono text-xs text-zinc-300">{e.output}</pre>
-            {/if}
+            </div>
           </div>
+        </div>
+
+        <!-- separator (full width) -->
+        {#if i < session.entries.length - 1 || session.awaiting === null}
+          <div class="border-t border-zinc-900"></div>
         {/if}
       {/each}
 
-      {#if session.ended}
-        <div class="py-2 text-center text-xs text-zinc-600">— 会话已结束 —</div>
-      {/if}
-    </div>
+      <!-- ═════════ INPUT AREA (console-style, contenteditable) ═════════ -->
+      <div class="border-t border-zinc-900"></div>
 
-    <!-- 输入区 -->
-    <div class="border-t border-zinc-800 bg-zinc-900/60 p-3">
-      <div
-        class="flex items-end gap-2 rounded border {session.awaiting
-          ? 'border-amber-500/60'
-          : 'border-zinc-800'} bg-zinc-950 px-3 py-2"
-      >
-        <span class="pb-1 font-mono text-amber-500">&gt;</span>
-        <textarea
-          bind:value={draft}
-          onkeydown={onKey}
-          {placeholder}
-          rows="1"
-          disabled={session.ended}
-          class="max-h-40 flex-1 resize-none bg-transparent font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none disabled:opacity-50"
-        ></textarea>
+      <div class="relative">
+        <div class="absolute left-0 top-0 bottom-0 w-0.5" style="background:#f59e0b"></div>
+
+        <div class="max-w-[700px] mx-auto">
+          <div class="flex items-start gap-2 pl-2 min-h-9">
+            <div class="shrink-0 w-6 flex justify-center pt-[11px]">
+              <ChevronRight size={14} class="text-amber-500" />
+            </div>
+            <div class="flex-1 min-w-0 py-1.5 pr-2">
+              <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+              <div
+                contenteditable="true"
+                role="textbox"
+                aria-multiline="true"
+                tabindex="0"
+                data-placeholder={placeholder}
+                bind:textContent={draft}
+                onkeydown={session.ended ? (e) => e.preventDefault() : onKey}
+                onbeforeinput={session.ended ? (e) => e.preventDefault() : undefined}
+                class="console-input"
+                class:ended={session.ended}
+              ></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{/snippet}
+
+<div class="flex flex-col h-screen bg-zinc-950 text-zinc-100">
+
+  <!-- ═══════════════ MAIN CONTENT ═══════════════ -->
+  {#if canUseRightPanel}
+    <PaneGroup direction="horizontal" autoSaveId="doit-panels" class="flex-1 overflow-hidden min-h-0">
+      <Pane defaultSize={60} minSize={30}>
+        {@render leftPanelContent()}
+      </Pane>
+
+      <PaneResizer class="w-px bg-zinc-800 hover:bg-amber-500 transition-colors" />
+
+      <!-- ═════════ RIGHT PANEL (pure content view, no icons) ═════════ -->
+      <Pane defaultSize={40} minSize={15}>
+        <div class="flex flex-col h-full border-l border-zinc-800">
+          {#if activeEntry}
+            <div class="flex-1 overflow-y-auto">
+              {#if activeEntry.kind === 'command'}
+                <XtermOutput
+                  text={activeEntry.output}
+                  narration={activeEntry.narration}
+                  command={activeEntry.command}
+                  exitCode={activeEntry.exit_code}
+                />
+
+              {:else if activeEntry.kind === 'reasoning'}
+                <div class="py-1.5 pl-2 pr-2 text-xs text-zinc-400">
+                  <Markdown text={activeEntry.text} />
+                </div>
+
+              {:else if activeEntry.kind === 'content'}
+                <div class="py-1.5 pl-2 pr-2">
+                  <Markdown text={activeEntry.text} />
+                </div>
+
+              {:else if activeEntry.kind === 'user'}
+                <div class="py-1.5 pl-2 pr-2">
+                  <span class="whitespace-pre-wrap text-sm text-zinc-300">{activeEntry.text}</span>
+                </div>
+
+              {:else if activeEntry.kind === 'prompt'}
+                <div class="py-1.5 pl-2 pr-2">
+                  <span class="whitespace-pre-wrap text-sm text-amber-200">{activeEntry.message}</span>
+                </div>
+
+              {:else}
+                <div class="py-1.5 pl-2 pr-2 text-xs text-zinc-600">
+                  No details
+                </div>
+              {/if}
+            </div>
+          {:else}
+            <div class="flex items-center justify-center h-full">
+              <span class="text-xs text-zinc-600">Select an entry to view details</span>
+            </div>
+          {/if}
+        </div>
+      </Pane>
+    </PaneGroup>
+  {:else}
+    <div class="flex flex-1 overflow-hidden min-h-0">
+      {@render leftPanelContent()}
+    </div>
+  {/if}
+
+  <!-- ═══════════════ BOTTOM NAV BAR ═══════════════ -->
+  <div class="shrink-0 border-t border-zinc-800 bg-zinc-900">
+    <div class="flex items-stretch justify-between h-8">
+      <div class="flex items-center gap-3 ml-3 text-xs text-zinc-500">
+        <span class="text-zinc-400">{meta.model || '—'}</span>
+        <span class="flex items-center gap-1">
+          <Brain size={12} />
+          <span>{meta.thinking ? 'on' : 'off'}</span>
+        </span>
+        <span>ctx {meta.context_chars.toLocaleString()}</span>
+      </div>
+
+      <div class="flex items-stretch">
+        {#if wide}
+          <button
+            onclick={() => (rightCollapsed = !rightCollapsed)}
+            class="flex items-center justify-center w-8 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300"
+            title={rightCollapsed ? 'show right panel' : 'hide right panel'}
+          >
+            {#if rightCollapsed}
+              <PanelRight size={14} />
+            {:else}
+              <PanelRightClose size={14} />
+            {/if}
+          </button>
+        {/if}
         <button
-          onclick={submit}
-          disabled={!session.awaiting || !draft.trim()}
-          class="rounded bg-amber-600 px-3 py-1 text-sm font-medium text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40"
+          class="flex items-center justify-center w-8 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300"
+          title="settings"
         >
-          发送
+          <Settings size={14} />
         </button>
       </div>
     </div>
-  {/if}
+  </div>
 </div>
+
+<style>
+  .console-input {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none;
+    background: transparent;
+    color: #f4f4f5;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-height: 1.5em;
+    caret-color: #f59e0b;
+  }
+  .console-input.ended {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .console-input:empty::before {
+    content: attr(data-placeholder);
+    color: #52525b;
+    pointer-events: none;
+  }
+</style>
