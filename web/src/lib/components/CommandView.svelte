@@ -11,6 +11,7 @@
 
   let container;
   let term = $state(null);
+  let lastWidth = 0;
   const fit = new FitAddon();
 
   onMount(() => {
@@ -25,7 +26,23 @@
     });
     term.loadAddon(fit);
     term.open(container);
-    return () => term?.dispose();
+
+    // 容器宽度变化(面板/窗口缩放)时按新列宽重排
+    const ro = new ResizeObserver(() => {
+      const w = container?.clientWidth ?? 0;
+      if (w && w !== lastWidth) {
+        lastWidth = w;
+        requestAnimationFrame(draw);
+      }
+    });
+    ro.observe(container);
+
+    return () => {
+      ro.disconnect();
+      const t = term;
+      term = null; // 置空以阻止已排队的 rAF draw 在销毁后操作终端
+      t?.dispose();
+    };
   });
 
   // term 就绪或 props 变化(如详情面板切换复用本组件)时重绘

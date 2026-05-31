@@ -13,9 +13,13 @@
 
   let scroller;
 
-  // entry 增减后,仅当用户已贴近底部时才跟随滚动,避免打断回看
+  // 仅当用户已贴近底部时才跟随滚动,避免打断回看。
+  // 依赖同时覆盖条目数与末条流式文本长度:reasoning/content 增量是就地追加
+  // (数组长度不变),若只依赖 length,流式输出时将不会滚动。
   $effect(() => {
-    void session.entries.length;
+    const list = session.entries;
+    const last = list[list.length - 1];
+    void (list.length + (last?.text?.length ?? 0) + (last?.output?.length ?? 0));
     tick().then(() => {
       if (!scroller) return;
       const gap = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;

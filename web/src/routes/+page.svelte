@@ -22,11 +22,17 @@
   onMount(() => {
     session.connect();
     refreshMeta();
+
     const mq = window.matchMedia('(min-width: 1200px)');
     wide = mq.matches;
-    mq.onchange = (e) => (wide = e.matches);
+    const onViewportChange = (e) => (wide = e.matches);
+    mq.addEventListener('change', onViewportChange);
+
     const timer = setInterval(refreshMeta, 3000);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      mq.removeEventListener('change', onViewportChange);
+    };
   });
 
   async function refreshMeta() {

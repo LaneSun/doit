@@ -68,9 +68,11 @@ export function createSession() {
         awaiting = 'prompt';
         break;
       case 'await_user':
+        streamKind = null;
         awaiting = 'user';
         break;
       case 'user_input':
+        streamKind = null;
         entries.push({ kind: 'user', text: ev.text });
         awaiting = null;
         break;
@@ -81,17 +83,36 @@ export function createSession() {
     }
   }
 
+  let reconnectTimer = null;
+
+  // 重连成功后清空本地状态,交由历史回放重建,避免条目重复
+  function reset() {
+    entries = [];
+    awaiting = null;
+    ended = false;
+    activeIndex = -1;
+    streamKind = null;
+  }
+
+  // 断线自动重连,依赖后端历史回放无缝恢复
   function connect() {
+    clearTimeout(reconnectTimer);
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     ws = new WebSocket(`${proto}://${location.host}/ws`);
-    ws.onopen = () => (connected = true);
-    ws.onclose = () => (connected = false);
+    ws.onopen = () => {
+      connected = true;
+      reset();
+    };
     ws.onmessage = (e) => {
       try {
         handle(JSON.parse(e.data));
       } catch {
         /* 忽略无法解析的帧 */
       }
+    };
+    ws.onclose = () => {
+      connected = false;
+      if (!ended) reconnectTimer = setTimeout(connect, 1000); // 会话已结束则不再重连
     };
   }
 
