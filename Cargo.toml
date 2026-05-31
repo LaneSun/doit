@@ -1,6 +1,6 @@
 [package]
 name = "doit-agent"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 description = "A shell-first AI agent — one tool, all tasks"
 license = "MIT"
