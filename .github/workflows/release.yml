@@ -28,21 +28,28 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-          if [ -n "$PREV_TAG" ]; then
+          TAG_MESSAGE=$(git tag -l --format='%(contents:body)' $GITHUB_REF_NAME 2>/dev/null || echo "")
+          if [ -n "$TAG_MESSAGE" ] && [ "$TAG_MESSAGE" != "$(git tag -l --format='%(contents:body)' $GITHUB_REF_NAME 2>/dev/null || echo "")" ]; then
             echo "notes<<EOF" >> $GITHUB_OUTPUT
-            echo "## Changes since $PREV_TAG" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-            git log --pretty=format:'- %s' $PREV_TAG..HEAD >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
+            echo "$TAG_MESSAGE" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
           else
-            echo "notes<<EOF" >> $GITHUB_OUTPUT
-            echo "## Initial Release" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-            git log --pretty=format:'- %s' >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+            if [ -n "$PREV_TAG" ]; then
+              echo "notes<<EOF" >> $GITHUB_OUTPUT
+              echo "## Changes since $PREV_TAG" >> $GITHUB_OUTPUT
+              echo "" >> $GITHUB_OUTPUT
+              git log --pretty=format:'- %s' $PREV_TAG..HEAD >> $GITHUB_OUTPUT
+              echo "" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+            else
+              echo "notes<<EOF" >> $GITHUB_OUTPUT
+              echo "## Initial Release" >> $GITHUB_OUTPUT
+              echo "" >> $GITHUB_OUTPUT
+              git log --pretty=format:'- %s' >> $GITHUB_OUTPUT
+              echo "" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+            fi
           fi
 
       - name: Create Release
@@ -63,20 +70,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
-
-      - name: Install bun
-        uses: oven-sh/setup-bun@v2
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
         with:
-          bun-version: latest
-
-      - name: Build web frontend
-        run: |
-          cd web
-          bun install
-          bun run build
-          cd ..
+          toolchain: stable
 
       - name: Cache cargo dependencies
         uses: actions/cache@v4
@@ -96,7 +93,7 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
   build-release-binaries:
-    name: Build (${{ matrix.target }})
+    name: Build Release Binaries (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
     needs: create-release
     strategy:
@@ -119,16 +116,13 @@ jobs:
             target: aarch64-apple-darwin
             binary: doit
             archive_ext: tar.gz
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            binary: doit.exe
-            archive_ext: zip
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: nightly
           targets: ${{ matrix.target }}
 
       - name: Install bun
@@ -162,8 +156,7 @@ jobs:
       - name: Build release binary
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Package (Unix)
-        if: matrix.os != 'windows-latest'
+      - name: Package binary
         run: |
           mkdir -p dist
           cp target/${{ matrix.target }}/release/${{ matrix.binary }} dist/
@@ -173,22 +166,10 @@ jobs:
           tar czf ../doit-${{ matrix.target }}.tar.gz *
           cd ..
 
-      - name: Package (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          mkdir dist
-          copy target\${{ matrix.target }}\release\${{ matrix.binary }} dist\
-          copy README.md dist\
-          copy LICENSE dist\
-          cd dist
-          7z a ..\doit-${{ matrix.target }}.zip *
-          cd ..
-
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
           files: |
             doit-*.tar.gz
-            doit-*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

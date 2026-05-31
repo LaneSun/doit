@@ -1,12 +1,12 @@
 use std::io::IsTerminal;
 
 use clap::Parser;
-use doit::cli::{Cli, Command};
-use doit::commands;
-use doit::config::Config;
-use doit::context::RuntimeContext;
-use doit::error::Result;
-use doit::i18n::{detect_locale, normalize_locale};
+use doit_agent::cli::{Cli, Command};
+use doit_agent::commands;
+use doit_agent::config::Config;
+use doit_agent::context::RuntimeContext;
+use doit_agent::error::Result;
+use doit_agent::i18n::{detect_locale, normalize_locale};
 use rust_i18n::t;
 
 rust_i18n::i18n!("locales");

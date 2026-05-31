@@ -1,5 +1,5 @@
 [package]
-name = "doit"
+name = "doit-agent"
 version = "0.1.0"
 edition = "2024"
 description = "A shell-first AI agent — one tool, all tasks"
@@ -10,6 +10,10 @@ homepage = "https://github.com/LaneSun/doit"
 keywords = ["ai", "agent", "cli", "shell", "llm"]
 categories = ["command-line-utilities", "development-tools"]
 rust-version = "1.91"
+
+[[bin]]
+name = "doit"
+path = "src/main.rs"
 
 [dependencies]
 async-trait = "0.1.89"

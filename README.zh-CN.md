@@ -1,6 +1,6 @@
 # doit — 以 Shell 为唯一工具的 AI Agent
 
-[![Crates.io](https://img.shields.io/crates/v/doit)](https://crates.io/crates/doit)
+[![Crates.io](https://img.shields.io/crates/v/doit-agent)](https://crates.io/crates/doit-agent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 [English](README.md) | [中文](README.zh-CN.md)
@@ -81,7 +81,7 @@ curl -fsSL https://raw.githubusercontent.com/LaneSun/doit/main/install.sh | sh -
 ### 使用 Cargo
 
 ```bash
-cargo install doit
+cargo install doit-agent
 ```
 
 ### 从源码构建

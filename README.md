@@ -1,6 +1,6 @@
 # doit — A Shell-First AI Agent
 
-[![Crates.io](https://img.shields.io/crates/v/doit)](https://crates.io/crates/doit)
+[![Crates.io](https://img.shields.io/crates/v/doit-agent)](https://crates.io/crates/doit-agent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 [English](README.md) | [中文](README.zh-CN.md)
@@ -81,7 +81,7 @@ curl -fsSL https://raw.githubusercontent.com/LaneSun/doit/main/install.sh | sh -
 ### Using Cargo
 
 ```bash
-cargo install doit
+cargo install doit-agent
 ```
 
 ### From Source

@@ -582,7 +582,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "doit"
+name = "doit-agent"
 version = "0.1.0"
 dependencies = [
  "assert_cmd",
