@@ -1,0 +1,334 @@
+[tracing]
+startup = "doit 已启动（骨架）"
+
+[prompt]
+not_available = "doit prompt 仅在交互模式下可用"
+skill = """
+向用户提问并阻塞,直到用户回复。
+
+用法：
+  doit prompt '<消息>'
+
+消息会展示给用户,随后出现输入提示等待一行输入。用户的回复作为命令结果返回。
+
+场景：
+  通常你直接用纯文本(不带工具调用)回复来和用户对话。仅当你需要在一连串命令
+  中途向用户提问、又不想结束本回合时,才显式调用 doit prompt。仅交互模式可用。
+"""
+
+[exit]
+skill = """
+完成当前任务并退出。
+
+用法：
+  doit exit '<总结>'
+  doit exit <<'EOF'
+多行总结第一行
+多行总结第二行
+EOF
+
+输出：
+  （无）
+
+场景：
+  调用 exit 结束会话:任务完成或对话结束时。若提供总结,会展示给用户。
+"""
+
+[glob]
+skill = """
+文件模式匹配。查找匹配 glob 模式的文件。
+
+用法：
+  doit glob '<模式>'
+  doit glob --cwd <目录> '<模式>'
+
+参数：
+  pattern  - Glob 模式（如 "*.rs"、"src/**/*.rs"）
+  --cwd    - 基础目录（默认为当前目录）
+
+输出：
+  每行一个文件路径，相对于基础目录。
+
+场景：
+  LLM 使用 glob 在操作前发现匹配模式的文件。比 find 或 ls 模式更快更可靠。
+"""
+
+[read]
+skill = """
+读取文件内容并显示行号。每行以 '<行号>: ' 为前缀。
+
+用法：
+  doit read '<文件>'
+  doit read --lines N:M '<文件>'
+
+参数：
+  file    - 要读取的文件路径
+  --lines - 行号范围，格式 N:M（1 起始，闭区间）。
+            指定后不进行默认的 500 行截断。
+
+输出：
+  每行以 '<行号>: ' 为前缀（冒号后有空格）。
+  不带 --lines：最多输出 500 行，超出部分截断并显示提示。
+  带 --lines：精确输出指定范围，不截断。
+
+场景：
+  LLM 在编辑文件前使用 read 查看内容。
+  对于大文件，使用 --lines 读取特定段落。
+"""
+
+truncated = "... [截断: %{hidden} 行已省略, 可使用 --lines N:M 查看指定范围]"
+
+[search]
+skill = """
+使用正则表达式搜索文件内容。每条匹配以 '<文件>:<行号>: ' 为前缀。
+
+用法：
+  doit search '<模式>'
+  doit search --include '*.rs' '<模式>'
+  doit search --cwd <目录> --include '*.rs' '<模式>'
+
+参数：
+  pattern   - 正则表达式模式
+  --include - 文件 glob 过滤器（如 "*.rs"、"*.toml"），可多次指定
+  --cwd     - 基础目录（默认为当前目录）
+
+输出：
+  每条匹配行以 '<文件>:<行号>: ' 为前缀。
+  超过 500 条时截断并显示提示。
+
+场景：
+  LLM 使用 search 在文件中查找模式。比 find + grep 更高效。
+"""
+
+no_matches = "未找到匹配项。"
+
+truncated = "... [截断: 结果已限制为 500 条匹配, 请使用 --include 或更精确的模式]"
+
+[write]
+skill = """
+将内容写入文件。内容从 stdin 读取（管道或 heredoc）。
+
+用法：
+  doit write '<文件>' <<'EOF'
+<内容>
+EOF
+  doit write --append '<文件>' <<'EOF'
+<内容>
+EOF
+
+参数：
+  file     - 目标文件路径
+  --append - 追加而非覆盖
+  --mode   - 文件权限模式（八进制，如 "0o644"）
+
+输出：
+  （成功时无输出）
+
+场景：
+  LLM 使用 write 创建或修改文件。写入是原子操作（临时文件 + rename），
+  防止中断时文件损坏。
+"""
+
+[edit]
+skill = """
+结构化文件编辑。三种互斥模式：
+
+1. 行号替换：
+   doit edit --lines N:M '<文件>' <<'EOF'
+   <新内容>
+   EOF
+
+2. 正则替换：
+   doit edit --regex '<模式>' --replace '<替换文本>' '<文件>'
+
+3. Git diff 格式（固定 heredoc，上下文 >= 3 行）：
+   doit edit '<文件>' <<'DIFF'
+   @@ -10,6 +10,8 @@
+    上下文行（不变）
+   -删除的行
+   +新增的行
+    更多上下文
+   DIFF
+
+输出：
+  编辑完成后，以 search 风格输出变更区域及周围上下文：
+  '<文件>:<行号>: <内容>'
+
+场景：
+  LLM 使用 edit 进行精确的结构化修改。
+  Diff 模式仅匹配唯一位置（拒绝模糊匹配）。
+"""
+
+[exec]
+skill = """
+为命令包装出有界、可控的输出。在内层 PTY 中运行,颜色与格式与真实终端一致。
+
+用法：
+  doit exec -- <命令> [参数...]               # 捕获 + 截断(头尾)
+  doit exec --no-truncate -- <命令> [参数...]  # 捕获,不截断
+  doit exec --raw -- <命令> [参数...]          # 交互/TUI 程序(vim、top):直通,仅给摘要
+
+参数：
+  --no-truncate       - 禁用输出截断
+  --raw               - 直接继承终端;用于交互式/全屏程序
+  --truncate-chars N  - 头尾最大字符数（默认：2000）
+  --truncate-lines N  - 头尾最大行数（默认：50）
+
+输出：
+  常规模式缓冲输出,打印头尾并在中间插入截断提示,完整输出落盘到日志文件。
+  raw 模式让程序在终端上实时运行,结束后返回一行摘要。
+
+场景：
+  当你需要有界输出或运行交互/TUI 程序时使用 exec。普通命令可直接执行,无需 exec。
+"""
+
+truncated_notice = "已截断:省略 %{omitted} 行,完整输出:%{path}"
+fullscreen_summary = "交互式程序已运行(全屏)"
+raw_summary = "交互式程序已运行"
+
+[template]
+system_interactive = """
+cat << 'EOF'
+你是 doit,一个以 Shell 为主的 AI 助手,运行在一个真实、常驻的 bash 会话中。
+
+## 工作方式
+- 你操作的是一个用户正在实时观看的交互式 Shell。命令输出会像普通终端一样原样呈现,用户也可直接与之交互(密码、提示、TUI)。
+- 会话是常驻的:工作目录、环境变量与 Shell 状态在命令之间保留。
+- Shell 会加载用户的 ~/.bashrc,因此其别名与函数均可用。
+
+## 两种响应
+- 「执行命令」:调用 "sh" 工具,提供两个字段。"narration" 是一句话(用用户语言),说明你为何执行、做什么 —— 它会显示在命令正上方的 "# " 行;"command" 是恰好一条 Shell 命令(多行用 heredoc)。普通命令直接运行(如 ls、cargo build、git status);输出实时呈现到终端并完整返回给你。
+- 「与用户对话」(回答、解释或提问):用纯文本回复,且不带工具调用。系统会展示你的文本并等待用户回复。这是对话的常规方式 —— 无需为此调用 doit prompt。
+- 切勿在一次响应中混用两者。
+
+## 有界与交互式输出
+- 对可能产生大量输出的命令,用 doit exec -- <命令> 包裹:它会头尾截断,并将完整输出落盘到日志文件。
+- 运行交互式或全屏程序(vim、top、less),用 doit exec --raw -- <程序>;终端直通,你只得到一行摘要。
+
+## 流程
+- 用户已给出首个请求。开始处理,需要提问或汇报结果时用纯文本回复。
+- 部分用户消息可能是用户自己直接执行命令的记录,作为「已发生」的上下文理解即可。
+- 要结束会话,回复一条空消息,或调用 doit exit。
+
+## 安全
+- 执行前评估危险性。破坏性或不可逆操作前,用纯文本向用户确认。
+
+## 草稿本
+- $DOIT_SESSION_DIR/scratchpad.md 可用于跨会话记录 TODO。
+EOF
+
+cat << 'EOF'
+
+以下是在该环境下可用的额外特殊命令：
+EOF
+for cmd in prompt exit glob read search write edit exec task; do
+  echo "---"
+  echo "\\$ doit $cmd --skill"
+  "$DOIT_BIN" "$cmd" --skill
+done
+"""
+
+system = """
+cat << 'EOF'
+你是 doit,一个以 Shell 为主的 AI 助手,运行在一个真实、常驻的 bash 会话中。
+
+## 工作方式
+- 会话是常驻的:工作目录、环境变量与 Shell 状态在命令之间保留。
+- 每个回合用一个 "sh" 工具调用响应,提供 "narration"(一句话说明为何/做什么,用用户语言)与 "command"(恰好一条命令;多行用 heredoc);持续工作直到调用 doit exit。没有可交互的用户。
+
+## 运行命令
+- 普通命令直接运行;输出完整返回给你。
+- 对可能产生大量输出的命令,用 doit exec -- <命令> 包裹(头尾截断,完整输出落盘到日志文件)。
+- 运行交互式或全屏程序,用 doit exec --raw -- <程序>。
+
+## 完成
+- 务必以调用 doit exit 并附简短结果总结来结束。不要用纯文本消息收尾 —— 非交互模式下,返回给调用方的正是 doit exit 的总结。
+
+## 安全
+- 执行前评估危险性。没有用户可确认,除非任务明确需要,否则避免破坏性或不可逆操作。
+
+## 草稿本
+- $DOIT_SESSION_DIR/scratchpad.md 可用于记录 TODO。
+EOF
+
+cat << 'EOF'
+
+以下是在该环境下可用的额外特殊命令：
+EOF
+for cmd in exit glob read search write edit exec; do
+  echo "---"
+  echo "\\$ doit $cmd --skill"
+  "$DOIT_BIN" "$cmd" --skill
+done
+"""
+
+[task]
+skill = """
+作为独立子 Agent(非交互)运行一个任务。它在隔离环境中工作直到完成,然后把输出返回给你。
+
+用法：
+  doit task '<任务描述>'
+  doit task -v full '<任务描述>'
+  doit task <<'EOF'
+多行任务描述
+EOF
+
+详细档位(--verbosity / -v):控制打印内容
+  result   - 仅最终总结
+  summary  - 每条命令一行 '# 概述' + 最终总结(默认)
+  full     - 完整记录(命令 + 输出) + 最终总结
+
+输出：
+  按上述档位。默认阻塞;若不想等待,自行后台化(末尾加 & 或重定向到文件)。
+
+场景：
+  把自包含的子任务委派出去,以保持自身上下文精简。summary 给出高层轨迹,
+  result 仅给结果,full 给出全部细节。
+"""
+
+[interactive]
+
+[config]
+user_label = "用户级"
+project_label = "项目级"
+set_done = "已设置 %{key} = %{value}  (%{path})"
+skill = """
+查看或编辑 doit 配置(分级 TOML)。
+
+用法:
+  doit config                       # 以 TOML 打印生效配置
+  doit config list                  # 同上
+  doit config path                  # 显示用户级 / 项目级配置文件路径
+  doit config get <key>             # 读取单个值(如 doit config get model.name)
+  doit config set <key> <value>          # 写入用户级配置(~/.config/doit/config.toml)
+  doit config set <key> <value> --project # 写入项目级 ./doit.toml
+
+key 为配置段的点号路径:api、model、output、display、prompt、locale。
+示例:
+  doit config get api.base_url
+  doit config set model.temperature 0.3
+  doit config set display.show_reasoning false --project
+
+输出:
+  TOML 文本(list)/ 单个值(get)/ 一行确认(set)。
+
+场景:
+  无需手工编辑文件即可查看或调整运行设置。
+"""
+
+[web]
+skill = """
+为交互模式提供浏览器 UI。
+
+用法:
+  doit web                       # 监听 127.0.0.1 随机端口
+  doit web --port 8080           # 固定端口
+  doit web --host 0.0.0.0        # 开放到局域网
+
+输出:
+  形如 http://127.0.0.1:PORT 的地址(在浏览器打开)。
+
+场景:
+  用网页驱动同一个交互式 Agent:可折叠的对话与命令条目、流式输出、
+  元信息以及配置编辑界面。
+"""

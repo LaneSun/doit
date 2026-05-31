@@ -9,7 +9,7 @@ use doit_agent::error::Result;
 use doit_agent::i18n::{detect_locale, normalize_locale};
 use rust_i18n::t;
 
-rust_i18n::i18n!("locales");
+include!(concat!(env!("OUT_DIR"), "/i18n_loader.rs"));
 
 #[tokio::main]
 async fn main() -> Result<()> {

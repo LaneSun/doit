@@ -1,0 +1,345 @@
+[tracing]
+startup = "doit started (skeleton)"
+
+[prompt]
+not_available = "doit prompt is only available in interactive mode"
+skill = """
+Ask the user a question and block until they reply.
+
+Usage:
+  doit prompt '<message>'
+
+The message is shown to the user, then an input prompt waits for one line of
+input. The reply is returned as the command result.
+
+Scenario:
+  Normally you just reply with plain text (no tool call) to talk to the user.
+  Call doit prompt explicitly only when you must ask a question in the middle of
+  a command sequence without ending your turn. Interactive mode only.
+"""
+
+[exit]
+skill = """
+Complete the current task and exit.
+
+Usage:
+  doit exit '<summary>'
+  doit exit <<'EOF'
+multiline summary line 1
+multiline summary line 2
+EOF
+
+Output:
+  (none)
+
+Scenario:
+  Call exit to end the session — when the task is complete or the conversation
+  is finished. The summary, if any, is shown to the user.
+"""
+
+[glob]
+skill = """
+File pattern matching. Finds files matching a glob pattern.
+
+Usage:
+  doit glob '<pattern>'
+  doit glob --cwd <dir> '<pattern>'
+
+Parameters:
+  pattern  - Glob pattern (e.g. "*.rs", "src/**/*.rs")
+  --cwd    - Base directory (defaults to current directory)
+
+Output:
+  One file path per line, relative to the base directory.
+
+Scenario:
+  The LLM uses glob to discover files matching a pattern before
+  operating on them. Faster and more reliable than find or ls patterns.
+"""
+
+[read]
+skill = """
+Read file contents with line numbers. Each line prefixed with '<line>: '.
+
+Usage:
+  doit read '<file>'
+  doit read --lines N:M '<file>'
+
+Parameters:
+  file    - Path to the file to read
+  --lines - Line range in N:M format (1-indexed, inclusive).
+            Disables the default 500-line truncation.
+
+Output:
+  Each line prefixed with '<line-number>: ' (space after colon).
+  Without --lines: at most 500 lines; excess is truncated with a notice.
+  With --lines: exact range, no truncation.
+
+Scenario:
+  The LLM uses read to inspect file contents before editing.
+  For large files, use --lines to read specific sections.
+"""
+
+truncated = "... [truncated: %{hidden} lines omitted, use --lines N:M to view a specific range]"
+
+[search]
+skill = """
+Search file contents with regular expressions. Each match prefixed with
+'<file>:<line>: ' (space after colon).
+
+Usage:
+  doit search '<pattern>'
+  doit search --include '*.rs' '<pattern>'
+  doit search --cwd <dir> --include '*.rs' '<pattern>'
+
+Parameters:
+  pattern   - Regular expression pattern
+  --include - File glob filter (e.g. "*.rs", "*.toml"). Repeatable.
+  --cwd     - Base directory (defaults to current directory)
+
+Output:
+  Each matching line prefixed with '<file>:<line>: '.
+  Truncated at 500 matches with a notice.
+
+Scenario:
+  The LLM uses search to find patterns across files. More efficient
+  than chaining find and grep.
+"""
+
+no_matches = "No matches found."
+
+truncated = "... [truncated: results limited to 500 matches, use --include or a narrower pattern]"
+
+[write]
+skill = """
+Write content to a file. Content is read from stdin (pipe or heredoc).
+
+Usage:
+  doit write '<file>' <<'EOF'
+<content>
+EOF
+  doit write --append '<file>' <<'EOF'
+<content>
+EOF
+
+Parameters:
+  file     - Target file path
+  --append - Append to file instead of overwriting
+  --mode   - File permission mode in octal (e.g. "0o644")
+
+Output:
+  (none on success)
+
+Scenario:
+  The LLM uses write to create or modify files. Writes are atomic
+  (tmp file + rename), preventing corruption on interrupt.
+"""
+
+[edit]
+skill = """
+Structured file editing. Three mutually exclusive modes:
+
+1. Line replacement:
+   doit edit --lines N:M '<file>' <<'EOF'
+   <new content>
+   EOF
+
+2. Regex replacement:
+   doit edit --regex '<pattern>' --replace '<replacement>' '<file>'
+
+3. Git diff format (fixed heredoc, >= 3 context lines):
+   doit edit '<file>' <<'DIFF'
+   @@ -10,6 +10,8 @@
+    context lines (unchanged)
+   -removed lines
+   +added lines
+    more context
+   DIFF
+
+Output:
+  After editing, the affected area with surrounding context is printed in
+  search-style format: '<file>:<line>: <content>'.
+
+Scenario:
+  The LLM uses edit to make precise, structured changes.
+  Diff mode matches exactly one location (refuses ambiguous matches).
+"""
+
+[exec]
+skill = """
+Wrap a command for bounded, controlled output. Runs in an inner PTY so colors
+and formatting match the real terminal.
+
+Usage:
+  doit exec -- <command> [args...]               # capture + truncate (head/tail)
+  doit exec --no-truncate -- <command> [args...]  # capture, no truncation
+  doit exec --raw -- <command> [args...]          # interactive/TUI (vim, top): pass through, summary only
+
+Parameters:
+  --no-truncate       - Disable output truncation
+  --raw               - Inherit the terminal directly; for interactive/full-screen programs
+  --truncate-chars N  - Max chars for head/tail (default: 2000)
+  --truncate-lines N  - Max lines for head/tail (default: 50)
+
+Output:
+  Normal mode buffers output, prints head+tail with a truncation notice in
+  between, and saves the full output to a log file. Raw mode runs the program
+  live on the terminal and returns a one-line summary.
+
+Scenario:
+  Use exec when you want bounded output or to run an interactive/TUI program.
+  Plain commands can be run directly without exec.
+"""
+
+truncated_notice = "truncated: %{omitted} more lines hidden, full output: %{path}"
+fullscreen_summary = "interactive program ran (fullscreen)"
+raw_summary = "interactive program ran"
+
+[template]
+system_interactive = """
+cat << 'EOF'
+You are doit, a shell-first AI assistant operating a real, persistent bash session.
+
+## How it works
+- You drive an interactive shell the user is watching live. Command output appears exactly as in a normal terminal, and the user can interact with it directly (passwords, prompts, TUIs).
+- The session is persistent: working directory, environment variables, and shell state carry over between commands.
+- The shell loads the user's ~/.bashrc, so their aliases and functions are available.
+
+## Two kinds of response
+- To RUN a command: call the "sh" tool with two fields. "narration" is one concise sentence (in the user's language) saying why you run it and what it does — it appears on a "# " line just above the command. "command" is exactly one shell command (use heredoc for multi-line input). Run ordinary commands as-is (e.g. ls, cargo build, git status); output streams live to the terminal and is returned to you in full.
+- To TALK to the user (answer, explain, or ask a question): reply with plain text and NO tool call. The session shows your text and waits for the user's reply. This is the normal way to converse — do not call doit prompt for this.
+- Never mix the two in one response.
+
+## Bounded & interactive output
+- For commands whose output may be large, wrap them: doit exec -- <command>. It truncates head/tail and saves the full output to a log file.
+- For interactive or full-screen programs (vim, top, less), use doit exec --raw -- <program>; the terminal is passed through and you get a short summary.
+
+## Flow
+- The user has already given you their first request. Work on it, then reply with plain text whenever you need to ask something or report results.
+- Some user messages may record commands the user ran directly; treat them as context for what already happened.
+- To end the session, reply with an empty message or call doit exit.
+
+## Safety
+- Evaluate danger before acting. Confirm with the user (plain text) before destructive or irreversible operations.
+
+## Scratchpad
+- $DOIT_SESSION_DIR/scratchpad.md is available for tracking TODOs across the session.
+EOF
+
+cat << 'EOF'
+
+Below are additional special commands available in this environment:
+EOF
+for cmd in prompt exit glob read search write edit exec task; do
+  echo "---"
+  echo "\\$ doit $cmd --skill"
+  "$DOIT_BIN" "$cmd" --skill
+done
+"""
+
+system = """
+cat << 'EOF'
+You are doit, a shell-first AI assistant operating a real, persistent bash session.
+
+## How it works
+- The session is persistent: working directory, environment variables, and shell state carry over between commands.
+- Each turn, respond with one "sh" tool call providing "narration" (one concise sentence on why/what, in the user's language) and "command" (exactly one shell command; use heredoc for multi-line). Keep working until you call doit exit. No interactive user is available.
+
+## Running commands
+- Run ordinary commands as-is; output is returned to you in full.
+- For potentially large output, wrap with doit exec -- <command> (truncates head/tail, full output saved to a log file).
+- For interactive or full-screen programs, use doit exec --raw -- <program>.
+
+## Completion
+- Always finish by calling doit exit with a short summary of the result. Do NOT end with a plain-text message — in non-interactive mode the doit exit summary is what gets returned to the caller.
+
+## Safety
+- Evaluate danger before acting. No user is available to confirm, so avoid destructive or irreversible actions unless clearly required by the task.
+
+## Scratchpad
+- $DOIT_SESSION_DIR/scratchpad.md is available for tracking TODOs.
+EOF
+
+cat << 'EOF'
+
+Below are additional special commands available in this environment:
+EOF
+for cmd in exit glob read search write edit exec; do
+  echo "---"
+  echo "\\$ doit $cmd --skill"
+  "$DOIT_BIN" "$cmd" --skill
+done
+"""
+
+[task]
+skill = """
+Run a task as an independent sub-agent (non-interactive). It works in isolation
+until it finishes, then returns its output to you.
+
+Usage:
+  doit task '<description>'
+  doit task -v full '<description>'
+  doit task <<'EOF'
+multiline task description
+EOF
+
+Verbosity (--verbosity / -v): controls what is printed
+  result   - only the final summary
+  summary  - one '# narration' line per command + final summary (default)
+  full     - complete transcript (commands + output) + final summary
+
+Output:
+  As selected above. Blocking by default; if you don't want to wait, background
+  it yourself (trailing & or redirect to a file).
+
+Scenario:
+  Delegate a self-contained subtask to keep your own context small. Use summary
+  for a high-level trace, result when you only need the outcome, full for detail.
+"""
+
+[interactive]
+
+[config]
+user_label = "user"
+project_label = "project"
+set_done = "set %{key} = %{value}  (%{path})"
+skill = """
+View or edit doit configuration (layered TOML).
+
+Usage:
+  doit config                       # print effective config as TOML
+  doit config list                  # same as above
+  doit config path                  # show user / project config file paths
+  doit config get <key>             # read one value (e.g. doit config get model.name)
+  doit config set <key> <value>          # write to user config (~/.config/doit/config.toml)
+  doit config set <key> <value> --project # write to ./doit.toml
+
+Keys are dotted paths into the config sections: api, model, output, display, prompt, locale.
+Examples:
+  doit config get api.base_url
+  doit config set model.temperature 0.3
+  doit config set display.show_reasoning false --project
+
+Output:
+  TOML text (list) / a single value (get) / a confirmation line (set).
+
+Scenario:
+  Inspect or adjust runtime settings without hand-editing files.
+"""
+
+[web]
+skill = """
+Serve a browser UI for interactive mode.
+
+Usage:
+  doit web                       # serve on 127.0.0.1 with a random port
+  doit web --port 8080           # fixed port
+  doit web --host 0.0.0.0        # expose on the local network
+
+Output:
+  A URL like http://127.0.0.1:PORT (open it in a browser).
+
+Scenario:
+  Drive the same interactive agent from a web page: collapsible conversation
+  and command entries, streaming output, meta info, and a config editor.
+"""

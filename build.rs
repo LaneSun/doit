@@ -3,8 +3,10 @@ use std::io::Write;
 use std::path::Path;
 
 fn main() {
-    let out_dir = Path::new("locales");
-    fs::create_dir_all(out_dir).unwrap();
+    let out_dir = std::env::var("OUT_DIR").unwrap();
+    let out_base = Path::new(&out_dir);
+    let locales_dir = out_base.join("locales");
+    fs::create_dir_all(&locales_dir).unwrap();
 
     let source_base = Path::new("src/locales");
     let commands_dir = Path::new("src/commands");
@@ -29,10 +31,14 @@ fn main() {
             }
         }
 
-        let out_path = out_dir.join(lang);
+        let out_path = locales_dir.join(lang);
         let mut out_file = fs::File::create(&out_path).unwrap();
         out_file.write_all(content.as_bytes()).unwrap();
     }
+
+    // Generate i18n loader that points to OUT_DIR locales
+    let loader_code = format!("rust_i18n::i18n!(\"{}/locales\");\n", out_base.display());
+    fs::write(out_base.join("i18n_loader.rs"), loader_code).unwrap();
 
     // Rerun if any locale source changes
     println!("cargo:rerun-if-changed=src/locales");
